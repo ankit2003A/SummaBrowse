@@ -6,6 +6,7 @@ WORKDIR /app
 
 # Set environment variables for noninteractive installation
 ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -33,4 +34,4 @@ ENV HOST=0.0.0.0
 ENV PORT=5000
 
 # Run with Gunicorn
-CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--timeout", "600", "--workers", "1"] 
+CMD ["gunicorn", "app:app", "--bind", "0.0.0.0:5000", "--timeout", "600", "--workers", "1", "--preload"] 

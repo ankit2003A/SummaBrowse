@@ -5,7 +5,6 @@ import whisper
 from pydub import AudioSegment
 from transformers import pipeline
 from sklearn.feature_extraction.text import TfidfVectorizer
-from moviepy import VideoFileClip
 from pydub.utils import which
 import uuid
 

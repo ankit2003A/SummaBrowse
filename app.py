@@ -4,8 +4,7 @@ import uuid
 from werkzeug.utils import secure_filename
 from text_extraction_and_summarization import TextExtractorAndSummarizer
 from process_pdf import PDFProcessor
-from process_video import YouTubeAudioProcessor  # Import the video processor
-from moviepy import VideoFileClip
+from process_video import YouTubeAudioProcessor
 from flask_cors import CORS
 
 app = Flask(__name__)

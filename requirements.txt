@@ -4,15 +4,13 @@ pillow==11.1.0
 pytesseract==0.3.13
 gunicorn
 PyMuPDF
-pdfplumber
 pdf2image
 transformers
 scikit-learn
 yt-dlp
 ffmpeg-python
 pydub
-moviepy
-flask-cors
 openai-whisper
+flask-cors
 torch
 sentencepiece 
