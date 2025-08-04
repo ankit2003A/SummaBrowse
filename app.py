@@ -22,7 +22,11 @@ os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 
 # Initialize the video processor
-video_processor = YouTubeAudioProcessor()
+try:
+    video_processor = YouTubeAudioProcessor()
+except Exception as e:
+    print(f"Warning: Could not initialize video processor: {e}")
+    video_processor = None
 
 @app.route('/')
 def index():
@@ -89,6 +93,9 @@ def process_file():
 @app.route('/process_video', methods=['POST'])
 def process_video():
     try:
+        if video_processor is None:
+            return jsonify({"error": "Video processing is not available"}), 500
+            
         if 'video_file' in request.files:
             # Handle local video file
             video_file = request.files['video_file']
@@ -110,7 +117,6 @@ def process_video():
         summary_file = os.path.join(app.config['OUTPUT_FOLDER'], "video_summary.txt")
         with open(summary_file, 'w', encoding='utf-8') as f:
             f.write(summary)
-
 
         return jsonify({
             "summary": summary,

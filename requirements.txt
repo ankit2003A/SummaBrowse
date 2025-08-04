@@ -13,5 +13,6 @@ ffmpeg-python
 pydub
 moviepy
 flask-cors
-whisper 
-torch 
+openai-whisper
+torch
+sentencepiece 
