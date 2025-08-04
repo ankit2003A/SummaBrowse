@@ -1,39 +1,43 @@
 import multiprocessing
 import os
 
-# Number of workers = (2 x $num_cores) + 1
-workers = min(2, multiprocessing.cpu_count() + 1)
+# Server socket
+bind = '0.0.0.0:' + os.environ.get('PORT', '10000')
 
-# Use a sync worker class for better memory management
+# Worker processes
+workers = int(os.environ.get('WEB_CONCURRENCY', 1))
 worker_class = 'sync'
-
-# Timeout after 120 seconds of no activity
+worker_connections = 1000
+max_requests = 1000
+max_requests_jitter = 50
+worker_max_requests = 1000
+worker_max_requests_jitter = 50
 timeout = 120
+keepalive = 5
 
-# Maximum number of requests a worker will process before restarting
-max_requests = 100
-max_requests_jitter = 20
+# Security
+limit_request_line = 4094
+limit_request_fields = 100
+limit_request_field_size = 8190
 
-# Maximum memory usage per worker (in MB)
-# This helps prevent memory leaks from consuming too much memory
-worker_max_requests = 100
-worker_max_requests_jitter = 20
+# Debugging
+reload = os.environ.get('FLASK_ENV') == 'development'
+reload_engine = 'auto'
 
-# Set environment variables
+# Server mechanics
+preload_app = True
+
+# Logging
+loglevel = os.environ.get('LOG_LEVEL', 'info')
+accesslog = '-'
+errorlog = '-'
+capture_output = True
+
+# Environment variables
 raw_env = [
     'FLASK_ENV=production',
     'PYTHONUNBUFFERED=1',
-    'TOKENIZERS_PARALLELISM=false',  # Disable tokenizer parallelism to avoid deadlocks
+    'PYTHONDONTWRITEBYTECODE=1',
+    'TOKENIZERS_PARALLELISM=false',
+    'PYTHONHASHSEED=random',
 ]
-
-# Logging configuration
-loglevel = 'info'
-errorlog = '-'
-accesslog = '-'
-capture_output = True
-
-# Bind to all network interfaces
-bind = '0.0.0.0:' + os.environ.get('PORT', '5000')
-
-# Preload the application to save memory
-preload_app = True

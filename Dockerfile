@@ -1,8 +1,5 @@
-# Use official Python slim image with specific version for better compatibility
+# Build stage
 FROM python:3.10-slim as builder
-
-# Set work directory
-WORKDIR /app
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -10,9 +7,45 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     DEBIAN_FRONTEND=noninteractive \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=100
+    PIP_DEFAULT_TIMEOUT=100 \
+    POETRY_VERSION=1.7.0
 
 # Install system dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential \
+    tesseract-ocr \
+    poppler-utils \
+    ffmpeg \
+    libsm6 \
+    libxext6 \
+    libgl1-mesa-glx \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Install Poetry
+RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
+
+# Set work directory
+WORKDIR /app
+
+# Copy only requirements first to leverage Docker cache
+COPY pyproject.toml poetry.lock* ./
+
+# Install dependencies
+RUN poetry config virtualenvs.in-project true \
+    && poetry install --no-interaction --no-ansi --no-root --only main
+
+# Copy application code
+COPY . .
+
+# Create necessary directories
+RUN mkdir -p uploads output downloads \
+    && chmod -R 755 /app/uploads /app/output /app/downloads
+
+# Runtime stage
+FROM python:3.10-slim
+
+# Install runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
     poppler-utils \
@@ -23,35 +56,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Create a non-root user
-RUN useradd -m appuser && chown -R appuser:appuser /app
-USER appuser
+# Create non-root user
+RUN useradd -m appuser
 
-# Set up a virtual environment
-ENV VIRTUAL_ENV=/app/venv
-RUN python -m venv $VIRTUAL_ENV
-ENV PATH="$VIRTUAL_ENV/bin:$PATH"
-
-# Install Python dependencies
-COPY --chown=appuser:appuser requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application code
-COPY --chown=appuser:appuser . .
-
-# Create necessary directories with correct permissions
-RUN mkdir -p uploads output downloads \
-    && chown -R appuser:appuser uploads output downloads
-
-# Final stage
-FROM python:3.10-slim
+# Set working directory
+WORKDIR /app
 
 # Copy from builder
-COPY --from=builder /app /app
-COPY --from=builder /home/appuser /home/appuser
+COPY --from=builder --chown=appuser:appuser /app /app
 
-# Set work directory and user
-WORKDIR /app
+# Switch to non-root user
 USER appuser
 
 # Set environment variables
@@ -59,14 +73,15 @@ ENV FLASK_APP=app.py \
     FLASK_ENV=production \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PATH="/app/venv/bin:$PATH"
+    PATH="/app/.venv/bin:$PATH" \
+    PYTHONPATH="/app"
 
 # Expose port
-EXPOSE 5000
+EXPOSE 10000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD curl -f http://localhost:5000/ || exit 1
+    CMD curl -f http://localhost:10000/health || exit 1
 
-# Run with Gunicorn using the config file
-CMD ["gunicorn", "-c", "gunicorn_config.py", "app:app"]
+# Command to run the application
+CMD ["gunicorn", "--config", "gunicorn_config.py", "app:app"]

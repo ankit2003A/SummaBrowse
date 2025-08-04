@@ -1,0 +1,38 @@
+[tool.poetry]
+name = "summabrowse"
+version = "0.1.0"
+description = "A web application for summarizing various types of content including images, PDFs, and videos."
+authors = ["Your Name <your.email@example.com>"]
+readme = "README.md"
+packages = [{include = "summabrowse"}]
+
+[tool.poetry.dependencies]
+python = "^3.10"
+flask = "^3.0.0"
+werkzeug = "^3.0.1"
+pillow = "^10.0.0"
+pytesseract = "^0.3.10"
+gunicorn = "^21.2.0"
+pymupdf = "^1.23.8"
+pdf2image = "^1.17.0"
+transformers = "^4.36.0"
+torch = "^2.1.0"
+sentencepiece = "^0.1.99"
+scikit-learn = "^1.3.0"
+numpy = "^1.26.0"
+pandas = "^2.1.0"
+python-dotenv = "^1.0.0"
+python-multipart = "^0.0.6"
+requests = "^2.31.0"
+yt-dlp = "^2023.12.30"
+ffmpeg-python = "^0.2.0"
+pydub = "^0.25.1"
+openai-whisper = "^20231117"
+flask-cors = "^4.0.0"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.poetry.scripts]
+summabrowse = 'app:main'

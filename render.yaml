@@ -2,7 +2,7 @@ services:
   - type: web
     name: summabrowse
     env: python
-    region: singapore  # Choose the region closest to you
+    region: singapore  # or choose another region: oregon, ohio, frankfurt, london, mumbai, singapore, sydney, tokyo
     build:
       dockerfile: Dockerfile
     envVars:
@@ -16,5 +16,16 @@ services:
         value: app.py
       - key: PORT
         value: 10000
-    plan: free  # Or 'starter' if you need more resources
+      - key: MAX_WORKERS
+        value: 2
+      - key: WEB_CONCURRENCY
+        value: 1
+    plan: free
     autoDeploy: true
+    healthCheckPath: /health
+    numInstances: 1
+    env: python3.10
+    disk:
+      name: summabrowse-disk
+      mountPath: /app/uploads
+      sizeGB: 1
