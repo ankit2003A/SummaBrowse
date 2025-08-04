@@ -39,20 +39,87 @@ class YouTubeAudioProcessor:
 
     def extract_audio_from_youtube(self, url):
         output_audio = "downloads/youtube_audio.mp3"
+        # Generate a random user agent to help avoid bot detection
+        import random
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/92.0.4515.107 Safari/537.36',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:89.0) Gecko/20100101 Firefox/89.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.1 Safari/605.1.15'
+        ]
+        
         ydl_opts = {
             'format': 'bestaudio/best',
             'extractaudio': True,
             'audioformat': 'mp3',
             'outtmpl': output_audio,
-            'quiet': False
+            'quiet': False,
+            'noplaylist': True,
+            'ignoreerrors': True,
+            'no_warnings': False,
+            'extract_flat': False,
+            'http_headers': {
+                'User-Agent': random.choice(user_agents),
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Connection': 'keep-alive',
+                'Upgrade-Insecure-Requests': '1',
+            },
+            'extractor_retries': 3,
+            'retries': 5,
+            'fragment_retries': 5,
+            'skip_unavailable_fragments': True,
+            'extractor_args': {
+                'youtube': {
+                    'skip': ['dash', 'hls'],
+                    'player_skip': ['js', 'webpage']
+                }
+            },
+            'cookiefile': 'cookies.txt'
         }
         try:
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                ydl.download([url])
-            print(f"✅ YouTube audio saved as {output_audio}")
-            return output_audio
+                # First try with the original URL
+                try:
+                    ydl.download([url])
+                    if os.path.exists(output_audio) and os.path.getsize(output_audio) > 0:
+                        return output_audio
+                except Exception as e:
+                    print(f"First attempt failed: {str(e)}")
+                
+                # If first attempt fails, try with a different URL format
+                try:
+                    # Try with a different URL format
+                    if 'youtu.be' in url:
+                        video_id = url.split('/')[-1].split('?')[0]
+                        new_url = f'https://www.youtube.com/watch?v={video_id}'
+                    else:
+                        video_id = url.split('v=')[-1].split('&')[0]
+                        new_url = f'https://youtu.be/{video_id}'
+                    
+                    print(f"Trying alternative URL format: {new_url}")
+                    ydl.download([new_url])
+                    if os.path.exists(output_audio) and os.path.getsize(output_audio) > 0:
+                        return output_audio
+                except Exception as e:
+                    print(f"Alternative URL attempt failed: {str(e)}")
+                
+                # If we still don't have a file, raise an error
+                if not os.path.exists(output_audio) or os.path.getsize(output_audio) == 0:
+                    raise Exception("Failed to download video after multiple attempts. YouTube might be rate limiting requests. Please try again later.")
+                
+                return output_audio
+                
         except Exception as e:
-            print(f"❌ Error downloading from YouTube: {e}")
+            error_msg = str(e)
+            if 'HTTP Error 429' in error_msg or '429' in error_msg:
+                error_msg = "YouTube is rate limiting requests. Please wait a few minutes and try again."
+            elif 'Sign in to confirm you\'re not a bot' in error_msg:
+                error_msg = "YouTube is blocking automated requests. Please try again later or use a different video."
+            print(f"❌ Error downloading from YouTube: {error_msg}")
             return None
 
     def extract_audio_from_video(self, video_path):
