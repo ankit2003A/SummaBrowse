@@ -228,7 +228,12 @@ class YouTubeAudioProcessor:
             audio_file = self.extract_audio_from_video(video_source)
 
         if not audio_file:
-            return "❌ Error extracting audio."
+            return {
+                "error": "Error extracting audio",
+                "summary": "",
+                "download_url": "",
+                "keywords": []
+            }
 
         # Step 2: Convert to WAV
         wav_file_path = "output/converted_audio.wav"

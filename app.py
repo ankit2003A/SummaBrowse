@@ -95,6 +95,8 @@ def process_video():
             video_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(video_file.filename))
             video_file.save(video_path)
             result = video_processor.process_video(video_path, is_youtube=False)
+            if "error" in result:
+                return jsonify({"error": result["error"]}), 500
             summary = result["summary"]
 
         else:
@@ -104,6 +106,8 @@ def process_video():
             if not video_source:
                 return jsonify({"error": "YouTube video URL is required."}), 400
             result = video_processor.process_video(video_source, is_youtube=True)
+            if "error" in result:
+                return jsonify({"error": result["error"]}), 500
             summary = result["summary"]
 
         # Return the summary and a download link
