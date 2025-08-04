@@ -54,10 +54,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsm6 \
     libxext6 \
     libgl1-mesa-glx \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/* \
     && mkdir -p /usr/share/tesseract-ocr/4.00/tessdata/ \
-    && ln -s /usr/share/tesseract-ocr/4.00/tessdata /usr/share/tessdata
+    && ln -s /usr/share/tesseract-ocr/4.00/tessdata /usr/share/tessdata \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN useradd -m appuser

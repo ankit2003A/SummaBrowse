@@ -4,16 +4,16 @@ import os
 # Server socket
 bind = '0.0.0.0:' + os.environ.get('PORT', '10000')
 
-# Worker processes
-workers = int(os.environ.get('WEB_CONCURRENCY', 1))
+# Worker processes - Reduced for Render's free tier
+workers = 1
 worker_class = 'sync'
 worker_connections = 1000
-max_requests = 1000
-max_requests_jitter = 50
-worker_max_requests = 1000
-worker_max_requests_jitter = 50
 timeout = 120
-keepalive = 5
+keepalive = 2
+max_requests = 1000
+max_requests_jitter = 100
+worker_max_requests = 1000
+worker_max_requests_jitter = 100
 
 # Security
 limit_request_line = 4094
