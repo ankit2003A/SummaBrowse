@@ -1,0 +1,164 @@
+/* Reset & Base Styles */
+* {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background-color: var(--background-color);
+    color: var(--text-color);
+    transition: background-color 0.3s ease, color 0.3s ease;
+    padding: 10px;
+    margin: 0 auto;
+    width: 450px; /* ⬅️ increase from 350px */
+    max-width: 100%;
+  }
+  
+  /* Container Styling */
+  .container {
+    width: 100%;
+    max-width: 450px; /* ⬅️ increase from 350px */
+    max-width: 400px;
+    margin: auto;
+    padding: 20px;
+    background-color: var(--card-bg-color, #f9f9f9);
+    border-radius: 12px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  }
+  
+  /* Header */
+  .container h3 {
+    text-align: center;
+    font-size: 20px;
+    margin-bottom: 16px;
+    color: var(--primary-color);
+  }
+  
+  /* Radio buttons */
+  label {
+    font-size: 14px;
+    margin-right: 10px;
+    display: inline-block;
+    cursor: pointer;
+    color: var(--text-color);
+  }
+  
+  /* Input Sections */
+  input[type="text"], input[type="file"] {
+    width: 100%;
+    padding: 8px;
+    margin-top: 8px;
+    margin-bottom: 12px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 14px;
+  }
+  
+  hr {
+    margin: 20px 0;
+    border: none;
+    border-top: 1px solid #ddd;
+  }
+  
+  /* Buttons */
+  button {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-top: 8px;
+    background-color: var(--button-bg-color);
+    color: var(--button-text-color);
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+  }
+  
+  button:hover {
+    background-color: var(--button-hover-bg-color);
+  }
+  
+  /* Loading, Error, Results */
+  .loading {
+    text-align: center;
+    color: var(--primary-color);
+    font-weight: bold;
+    margin-top: 10px;
+  }
+  
+  .error {
+    color: red;
+    font-size: 14px;
+    text-align: center;
+    margin-top: 8px;
+  }
+  .hidden {
+    display: none;
+  }
+  
+  .results {
+    background-color: var(--results-bg-color, #f0f0f0);
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    margin-top: 6px;
+    white-space: pre-wrap;
+  }
+  
+  /* Result sections */
+  #results, #videoResults {
+    margin-top: 16px;
+  }
+  
+  #results h4, #videoResults h4 {
+    font-size: 15px;
+    margin-bottom: 4px;
+    color: var(--primary-color);
+  }
+  
+  /* Download Links */
+  a#downloadLink,
+  a#downloadLink1 {
+    display: inline-block;
+    margin-top: 8px;
+    font-size: 13px;
+    color: var(--link-color);
+    text-decoration: none;
+    transition: text-decoration 0.2s ease;
+  }
+  
+  a#downloadLink:hover,
+  a#downloadLink1:hover {
+    text-decoration: underline;
+  }
+  
+  /* Light Theme Variables */
+  :root {
+    --background-color: #ffffff;
+    --card-bg-color: #f9f9f9;
+    --text-color: #333333;
+    --primary-color: #007bff;
+    --button-bg-color: #007bff;
+    --button-text-color: #ffffff;
+    --button-hover-bg-color: #0056b3;
+    --link-color: #007bff;
+    --results-bg-color: #f0f4ff;
+  }
+  
+  /* Dark Mode Theme (Optional - toggle by adding .dark-mode to <body>) */
+  body.dark-mode {
+    --background-color: #1e1e1e;
+    --card-bg-color: #2a2a2a;
+    --text-color: #f0f0f0;
+    --primary-color: #4dabf7;
+    --button-bg-color: #2196f3;
+    --button-text-color: #ffffff;
+    --button-hover-bg-color: #1565c0;
+    --link-color: #4dabf7;
+    --results-bg-color: #333;
+  }
+  

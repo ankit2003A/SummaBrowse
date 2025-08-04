@@ -1,0 +1,200 @@
+/* Reset & Base Styling */
+body {
+  font-family: 'Segoe UI', 'Arial', sans-serif;
+  font-size: 14px;
+  width: 360px;
+  padding: 15px;
+  margin: 0;
+  background-color: var(--background-color);
+  color: var(--text-color);
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* Section Containers */
+.upload-section,
+.video-section {
+  border: 1.5px dashed #ccc;
+  border-radius: 8px;
+  padding: 12px;
+  margin-bottom: 20px;
+  background-color: var(--card-bg-color);
+  text-align: center;
+  transition: background-color 0.3s ease;
+}
+
+/* Header */
+header {
+  margin-bottom: 16px;
+  text-align: center;
+}
+
+header h1 {
+  font-size: 20px;
+  margin-bottom: 4px;
+}
+
+header p {
+  font-size: 13px;
+  color: var(--secondary-text-color);
+}
+
+/* Inputs */
+input[type="text"],
+input[type="file"] {
+  width: 100%;
+  padding: 6px;
+  margin-top: 6px;
+  margin-bottom: 10px;
+  font-size: 13px;
+  border-radius: 4px;
+  border: 1px solid #ccc;
+}
+
+input[type="file"] {
+  display: none;
+}
+
+/* File Upload Label */
+.upload-section label,
+.video-section label {
+  cursor: pointer;
+  font-weight: 500;
+  color: var(--link-color);
+  text-decoration: underline;
+}
+
+/* Buttons */
+button {
+  padding: 8px 16px;
+  background-color: var(--button-bg-color);
+  color: var(--button-text-color);
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: background-color 0.3s ease;
+}
+
+button:hover {
+  background-color: var(--button-hover-bg-color);
+}
+
+/* Result Display */
+.result-section {
+  background-color: var(--card-bg-color);
+  padding: 8px;
+  border-radius: 6px;
+  margin-top: 12px;
+  font-size: 13px;
+  text-align: left;
+  word-wrap: break-word;
+  transition: background-color 0.3s ease;
+}
+
+.result-section p {
+  margin: 6px 0;
+}
+
+/* Download Link */
+#downloadLink, #downloadLink1 {
+  display: none;
+  margin-top: 10px;
+  color: var(--link-color);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+#downloadLink:hover, #downloadLink1:hover {
+  text-decoration: underline;
+}
+
+/* Loading/Error States */
+.loading,
+.error,
+.results {
+  font-size: 13px;
+  margin-top: 10px;
+  text-align: center;
+}
+
+/* Theme Toggle */
+.theme-toggle {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 10px;
+  gap: 10px;
+}
+
+.switch {
+  position: relative;
+  display: inline-block;
+  width: 38px;
+  height: 20px;
+}
+
+.switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background-color: #ccc;
+  border-radius: 20px;
+  transition: background-color 0.3s;
+}
+
+.slider:before {
+  content: "";
+  position: absolute;
+  height: 16px;
+  width: 16px;
+  left: 2px;
+  bottom: 2px;
+  background-color: white;
+  border-radius: 50%;
+  transition: transform 0.3s;
+}
+
+input:checked + .slider {
+  background-color: #007bff;
+}
+
+input:checked + .slider:before {
+  transform: translateX(18px);
+}
+
+/* Light Theme Variables */
+:root {
+  --background-color: #f9f9f9;
+  --card-bg-color: #ffffff;
+  --text-color: #222222;
+  --secondary-text-color: #666666;
+  --button-bg-color: #007bff;
+  --button-text-color: #ffffff;
+  --button-hover-bg-color: #0056b3;
+  --link-color: #007bff;
+}
+
+/* Dark Theme Overrides */
+body.dark-mode {
+  --background-color: #121212;
+  --card-bg-color: #1e1e1e;
+  --text-color: #f0f0f0;
+  --secondary-text-color: #aaaaaa;
+  --button-bg-color: #1e88e5;
+  --button-text-color: #ffffff;
+  --button-hover-bg-color: #1565c0;
+  --link-color: #90caf9;
+}
+.container {
+  padding: 15px;
+  background-color: var(--card-bg-color);
+  border-radius: 10px;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+}
