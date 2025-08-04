@@ -45,16 +45,19 @@ RUN mkdir -p uploads output downloads \
 # Runtime stage
 FROM python:3.10-slim
 
-# Install runtime dependencies
+# Install runtime dependencies with language packs
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
+    tesseract-ocr-eng \
     poppler-utils \
     ffmpeg \
     libsm6 \
     libxext6 \
     libgl1-mesa-glx \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && mkdir -p /usr/share/tesseract-ocr/4.00/tessdata/ \
+    && ln -s /usr/share/tesseract-ocr/4.00/tessdata /usr/share/tessdata
 
 # Create non-root user
 RUN useradd -m appuser
