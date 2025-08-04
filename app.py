@@ -1,31 +1,16 @@
 import os
-from flask import Flask, render_template, request, jsonify, send_file
+from flask import render_template, request, jsonify, send_file
 import uuid
 from werkzeug.utils import secure_filename
-from text_extraction_and_summarization import TextExtractorAndSummarizer
-from process_pdf import PDFProcessor
-from process_video import YouTubeAudioProcessor
 from flask_cors import CORS
+from app_factory import app, app_factory
 
-app = Flask(__name__)
+# Initialize CORS with the app from factory
 CORS(app, origins=["chrome-extension://ldemhkhknojajajjfomnhcpmdcfilggh"])
-
-UPLOAD_FOLDER = 'uploads'
-OUTPUT_FOLDER = 'output'
-app.config['UPLOAD_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), UPLOAD_FOLDER)
-app.config['OUTPUT_FOLDER'] = os.path.join(os.path.dirname(os.path.abspath(__file__)), OUTPUT_FOLDER)
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 16MB max file size
 
 # Ensure directories exist
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
-
-# Initialize the video processor
-try:
-    video_processor = YouTubeAudioProcessor()
-except Exception as e:
-    print(f"Warning: Could not initialize video processor: {e}")
-    video_processor = None
 
 @app.route('/')
 def index():
@@ -57,13 +42,21 @@ def process_file():
         text, summary = None, None
 
         if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            summarizer = TextExtractorAndSummarizer()
-            text = summarizer.extract_text_from_image(file_path)
-            summary = summarizer.generate_summary(text) if text else None
+            try:
+                summarizer = app_factory.get_image_processor()
+                text = summarizer.extract_text_from_image(file_path)
+                summary = summarizer.generate_summary(text) if text else None
+            except Exception as e:
+                print(f"Error in image processing: {str(e)}")
+                return jsonify({'error': 'Error processing image'}), 500
         elif filename.lower().endswith('.pdf'):
-            processor = PDFProcessor()
-            text = processor.extract_text_with_ocr(file_path)
-            summary = processor.summarize_text(text) if text else None
+            try:
+                processor = app_factory.get_pdf_processor()
+                text = processor.extract_text_with_ocr(file_path)
+                summary = processor.summarize_text(text) if text else None
+            except Exception as e:
+                print(f"Error in PDF processing: {str(e)}")
+                return jsonify({'error': 'Error processing PDF'}), 500
         else:
             return jsonify({'error': 'Unsupported file type'}), 400
 
@@ -92,6 +85,7 @@ def process_file():
 @app.route('/process_video', methods=['POST'])
 def process_video():
     try:
+        video_processor = app_factory.get_video_processor()
         if video_processor is None:
             return jsonify({"error": "Video processing is not available"}), 500
             

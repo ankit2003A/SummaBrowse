@@ -1,33 +1,11 @@
 import os
 import pytesseract
 from PIL import Image
-
-# Set Tesseract path for Windows
-tesseract_paths = [
-    r'C:\Program Files\Tesseract-OCR\tesseract.exe',
-    r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
-    r'C:\Tesseract-OCR\tesseract.exe'
-]
-
-def find_tesseract():
-    """Find Tesseract executable"""
-    for path in tesseract_paths:
-        if os.path.exists(path):
-            return path
-    return None
+from utils import setup_tesseract
 
 class TextExtractorAndSummarizer:
     def __init__(self):
-        # Set Tesseract path for Windows
-        tesseract_path = find_tesseract()
-        if tesseract_path:
-            pytesseract.pytesseract.tesseract_cmd = tesseract_path
-        else:
-            print("Warning: Tesseract not found in common locations.")
-            print("Please install Tesseract from: https://github.com/UB-Mannheim/tesseract/wiki")
-            print("Expected locations:")
-            for path in tesseract_paths:
-                print(f"- {path}")
+        setup_tesseract(pytesseract)
 
     def extract_text_from_image(self, image_path):
         """

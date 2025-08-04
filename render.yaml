@@ -1,0 +1,20 @@
+services:
+  - type: web
+    name: summabrowse
+    env: python
+    region: singapore  # Choose the region closest to you
+    build:
+      dockerfile: Dockerfile
+    envVars:
+      - key: PYTHONUNBUFFERED
+        value: 1
+      - key: PYTHONDONTWRITEBYTECODE
+        value: 1
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: app.py
+      - key: PORT
+        value: 10000
+    plan: free  # Or 'starter' if you need more resources
+    autoDeploy: true

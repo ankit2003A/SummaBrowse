@@ -15,7 +15,27 @@ os.makedirs("output", exist_ok=True)
 
 class YouTubeAudioProcessor:
     def __init__(self):
-        self.summarizer = pipeline("summarization", model="sshleifer/distilbart-cnn-12-6")
+        # Don't load the model until it's actually needed
+        self._summarizer = None
+        self._whisper_model = None
+        
+    @property
+    def summarizer(self):
+        if self._summarizer is None:
+            print("Loading summarization model...")
+            from transformers import pipeline
+            # Use a smaller model for summarization
+            self._summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+        return self._summarizer
+        
+    @property
+    def whisper_model(self):
+        if self._whisper_model is None:
+            print("Loading Whisper model...")
+            import whisper
+            # Use the tiny model for lower memory usage
+            self._whisper_model = whisper.load_model("tiny")
+        return self._whisper_model
 
     def extract_audio_from_youtube(self, url):
         output_audio = "downloads/youtube_audio.mp3"
@@ -57,22 +77,58 @@ class YouTubeAudioProcessor:
 
     def audio_to_text(self, audio_file):
         print("🔊 Transcribing audio using Whisper (tiny)...")
-        model = whisper.load_model("tiny")  # Use tiny model for speed
-        result = model.transcribe(audio_file)
-        transcription = result["text"]
-        print("📝 Transcription complete.")
-        with open("output/transcription.txt", "w", encoding="utf-8") as f:
-            f.write(transcription)
-        return transcription
+        try:
+            result = self.whisper_model.transcribe(audio_file)
+            transcription = result["text"]
+            print("📝 Transcription complete.")
+            with open("output/transcription.txt", "w", encoding="utf-8") as f:
+                f.write(transcription)
+            return transcription
+        except Exception as e:
+            print(f"Error in audio transcription: {str(e)}")
+            return ""
 
     def summarize_text(self, text):
-        max_chunk = 512  # Larger chunk for efficiency
-        chunks = [text[i:i+max_chunk] for i in range(0, len(text), max_chunk)]
-        summarized_chunks = []
-        for chunk in chunks:
-            summary = self.summarizer(chunk, max_length=200, min_length=30, do_sample=False)
-            summarized_chunks.append(summary[0]['summary_text'])
-        return "\n".join(summarized_chunks)
+        if not text.strip():
+            return "No text to summarize"
+            
+        try:
+            max_chunk = 1000  # Larger chunk to reduce API calls
+            chunks = [text[i:i+max_chunk] for i in range(0, len(text), max_chunk)]
+            print(f"Processing {len(chunks)} chunks for summarization...")
+            
+            # Process chunks in batches to save memory
+            batch_size = 2
+            summarized_chunks = []
+            
+            for i in range(0, len(chunks), batch_size):
+                batch = chunks[i:i+batch_size]
+                try:
+                    # Process batch
+                    summaries = self.summarizer(
+                        batch,
+                        max_length=150,  # Shorter summaries
+                        min_length=30,
+                        do_sample=False,
+                        truncation=True
+                    )
+                    summarized_chunks.extend([s['summary_text'] for s in summaries])
+                    # Clear memory after each batch
+                    import torch
+                    torch.cuda.empty_cache() if torch.cuda.is_available() else None
+                except Exception as e:
+                    print(f"Error in batch {i//batch_size + 1}: {str(e)}")
+                    # Fallback: take first few sentences if summarization fails
+                    for chunk in batch:
+                        sentences = chunk.split('. ')
+                        summarized_chunks.append('. '.join(sentences[:2]) + '.')
+            
+            return " ".join(summarized_chunks)
+            
+        except Exception as e:
+            print(f"Error in summarization: {str(e)}")
+            # Fallback: return first 200 characters if everything fails
+            return text[:200] + "..." if len(text) > 200 else text
 
     def extract_keywords(self, text, num_keywords=10):
         vectorizer = TfidfVectorizer(stop_words="english")
