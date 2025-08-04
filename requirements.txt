@@ -14,3 +14,4 @@ pydub
 moviepy
 flask-cors
 whisper 
+torch 
