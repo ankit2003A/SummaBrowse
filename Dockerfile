@@ -1,39 +1,31 @@
-# Build stage
-FROM python:3.10-slim as builder
-
-# Set environment variables
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    DEBIAN_FRONTEND=noninteractive \
-    PIP_NO_CACHE_DIR=1 \
-    PIP_DISABLE_PIP_VERSION_CHECK=1 \
-    PIP_DEFAULT_TIMEOUT=100 \
-    POETRY_VERSION=1.7.0
+# Use Python 3.10 slim base image
+FROM python:3.10-slim
 
 # Install system dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    build-essential \
+RUN apt-get update && apt-get install -y \
     tesseract-ocr \
+    tesseract-ocr-eng \
+    libtesseract-dev \
     poppler-utils \
     ffmpeg \
     libsm6 \
     libxext6 \
     libgl1-mesa-glx \
-    && rm -rf /var/lib/apt/lists/* \
-    && apt-get clean
+    && rm -rf /var/lib/apt/lists/*
 
-# Install Poetry
-RUN pip install --no-cache-dir "poetry==$POETRY_VERSION"
-
-# Set work directory
+# Set working directory
 WORKDIR /app
 
-# Copy only requirements first to leverage Docker cache
-COPY pyproject.toml poetry.lock* ./
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    FLASK_APP=app.py \
+    FLASK_ENV=production \
+    PORT=10000
 
-# Install dependencies
-RUN poetry config virtualenvs.in-project true \
-    && poetry install --no-interaction --no-ansi --no-root --only main
+# Install Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY . .
@@ -42,15 +34,11 @@ COPY . .
 RUN mkdir -p uploads output downloads \
     && chmod -R 755 /app/uploads /app/output /app/downloads
 
-# Runtime stage
-FROM python:3.10-slim
+# Expose the port the app runs on
+EXPOSE 10000
 
-# Install runtime dependencies with language packs
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    tesseract-ocr \
-    tesseract-ocr-eng \
-    poppler-utils \
-    ffmpeg \
+# Command to run the application
+CMD ["gunicorn", "--bind", "0.0.0.0:10000", "app:app"]
     libsm6 \
     libxext6 \
     libgl1-mesa-glx \

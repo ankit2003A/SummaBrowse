@@ -1,6 +1,7 @@
 import os
 
 tesseract_paths = [
+    r'C:\Program Files\Tesseract-OCR\tesseract.exe',  # Your Tesseract installation path
     r'C:\Program Files\Tesseract-OCR\tesseract.exe',
     r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
     r'C:\Tesseract-OCR\tesseract.exe'
