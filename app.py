@@ -1,136 +1,68 @@
 import os
-import uuid
-from flask import Flask, render_template, request, jsonify, send_file
-from werkzeug.utils import secure_filename
+from flask import Flask, render_template, request, send_from_directory, jsonify
 from flask_cors import CORS
-from app_factory import app, app_factory
+from werkzeug.utils import secure_filename
+from PIL import Image
+import pytesseract
 
-# Enable CORS for your Chrome extension or any frontend
-CORS(app, origins=["chrome-extension://ldemhkhknojajajjfomnhcpmdcfilggh"])
+# ✅ For Docker: don't set Windows tesseract path
+# Tesseract is already installed and accessible in Docker path
+# Remove or comment out Windows-specific lines
 
-# Configure paths according to Render disk mount
-app.config['UPLOAD_FOLDER'] = "/app/uploads/input"
-app.config['OUTPUT_FOLDER'] = "/app/uploads/output"
+# Create app
+app = Flask(__name__)
+CORS(app)
 
-# Ensure the folders exist
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
-os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
+# Config
+UPLOAD_FOLDER = os.path.join(os.getcwd(), 'uploads')
+OUTPUT_FOLDER = os.path.join(os.getcwd(), 'output')
+DOWNLOAD_FOLDER = os.path.join(os.getcwd(), 'downloads')
+
+for folder in [UPLOAD_FOLDER, OUTPUT_FOLDER, DOWNLOAD_FOLDER]:
+    os.makedirs(folder, exist_ok=True)
+
+app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
+
+# ✅ Optional: Health check route for Render
+@app.route('/healthz')
+def healthz():
+    return "OK", 200
 
 @app.route('/')
 def index():
     return render_template('index.html')
 
-@app.route('/healthz', methods=['GET'])
-def healthz():
-    return jsonify({"status": "ok"}), 200
-
-
 @app.route('/process', methods=['POST'])
-def process_file():
+def process():
     if 'file' not in request.files:
-        return jsonify({'error': 'No file uploaded'}), 400
+        return "No file part", 400
 
     file = request.files['file']
     if file.filename == '':
-        return jsonify({'error': 'No file selected'}), 400
+        return "No selected file", 400
 
     filename = secure_filename(file.filename)
-    file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+    input_path = os.path.join(app.config['UPLOAD_FOLDER'], 'input', filename)
+    os.makedirs(os.path.dirname(input_path), exist_ok=True)
+    file.save(input_path)
 
-    # Ensure unique filename
-    base, ext = os.path.splitext(filename)
-    counter = 1
-    while os.path.exists(file_path):
-        filename = f"{base}_{counter}{ext}"
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
-        counter += 1
-
-    file.save(file_path)
+    print(f"Tesseract path: {pytesseract.pytesseract.tesseract_cmd}")
+    print(f"Image path: {input_path}")
 
     try:
-        text, summary = None, None
-
-        if filename.lower().endswith(('.png', '.jpg', '.jpeg')):
-            summarizer = app_factory.get_image_processor()
-            text = summarizer.extract_text_from_image(file_path)
-            summary = summarizer.generate_summary(text) if text else None
-
-        elif filename.lower().endswith('.pdf'):
-            processor = app_factory.get_pdf_processor()
-            text = processor.extract_text_with_ocr(file_path)
-            summary = processor.summarize_text(text) if text else None
-
-        else:
-            return jsonify({'error': 'Unsupported file type'}), 400
-
-        if not text:
-            return jsonify({'error': 'Failed to extract text from the file'}), 500
-        if not summary:
-            return jsonify({'error': 'Failed to generate summary'}), 500
-
-        extracted_text_file = os.path.join(app.config['OUTPUT_FOLDER'], "extracted_text.txt")
-        summary_file = os.path.join(app.config['OUTPUT_FOLDER'], f"summary_{uuid.uuid4().hex}.txt")
-
-        with open(extracted_text_file, 'w', encoding='utf-8') as f:
-            f.write(text)
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write(summary)
-
-        return jsonify({
-            'extracted_text': text,
-            'summary': summary,
-            'download_url': f'/download/{os.path.basename(summary_file)}'
-        })
-
+        text = pytesseract.image_to_string(Image.open(input_path))
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        print("Error extracting text from image:", str(e))
+        return f"Error processing image: {str(e)}", 500
 
-@app.route('/process_video', methods=['POST'])
-def process_video():
-    try:
-        video_processor = app_factory.get_video_processor()
-        if video_processor is None:
-            return jsonify({"error": "Video processing is not available"}), 500
+    output_filename = os.path.splitext(filename)[0] + "_output.txt"
+    output_path = os.path.join(OUTPUT_FOLDER, output_filename)
 
-        if 'video_file' in request.files:
-            video_file = request.files['video_file']
-            video_path = os.path.join(app.config['UPLOAD_FOLDER'], secure_filename(video_file.filename))
-            video_file.save(video_path)
-            result = video_processor.process_video(video_path, is_youtube=False)
-        else:
-            data = request.json
-            video_source = data.get("video_source")
-            if not video_source:
-                return jsonify({"error": "YouTube video URL is required."}), 400
-            result = video_processor.process_video(video_source, is_youtube=True)
+    with open(output_path, 'w', encoding='utf-8') as f:
+        f.write(text)
 
-        if "error" in result:
-            return jsonify({"error": result["error"]}), 500
-
-        summary = result["summary"]
-        summary_file = os.path.join(app.config['OUTPUT_FOLDER'], "video_summary.txt")
-
-        with open(summary_file, 'w', encoding='utf-8') as f:
-            f.write(summary)
-
-        return jsonify({
-            "summary": summary,
-            "download_url": result.get("download_url", f'/download/{os.path.basename(summary_file)}'),
-            "keywords": result.get("keywords", [])
-        })
-
-    except Exception as e:
-        return jsonify({"error": str(e)}), 500
-
-@app.route('/download/<filename>', methods=['GET'])
-def download_file(filename):
-    file_path = os.path.join(app.config['OUTPUT_FOLDER'], filename)
-    if os.path.exists(file_path):
-        return send_file(file_path, as_attachment=True)
-    else:
-        return jsonify({'error': f'File {filename} not found'}), 404
+    return send_from_directory(OUTPUT_FOLDER, output_filename, as_attachment=True)
 
 if __name__ == '__main__':
-    host = os.environ.get('HOST', '0.0.0.0')
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host=host, port=port)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(debug=False, host='0.0.0.0', port=port)
