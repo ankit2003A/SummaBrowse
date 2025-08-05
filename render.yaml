@@ -2,7 +2,7 @@ services:
   - type: web
     name: summabrowse
     env: python
-    region: singapore  # or choose another region: oregon, ohio, frankfurt, london, mumbai, singapore, sydney, tokyo
+    region: oregon
     build:
       dockerfile: Dockerfile
     envVars:
@@ -16,10 +16,10 @@ services:
         value: app.py
       - key: PORT
         value: 10000
-      - key: MAX_WORKERS
-        value: 2
       - key: WEB_CONCURRENCY
-        value: 1
+        value: "2"
+      - key: GUNICORN_CMD_ARGS
+        value: "--workers=2 --threads=2"
     plan: free
     autoDeploy: true
     healthCheckPath: /healthz
