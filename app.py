@@ -20,10 +20,10 @@ os.makedirs(app.config['OUTPUT_FOLDER'], exist_ok=True)
 def index():
     return render_template('index.html')
 
-@app.route('/health', methods=['GET'])
 @app.route('/healthz', methods=['GET'])
-def health():
-    return 'OK', 200
+def healthz():
+    return jsonify({"status": "ok"}), 200
+
 
 @app.route('/process', methods=['POST'])
 def process_file():

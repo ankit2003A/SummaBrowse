@@ -22,7 +22,7 @@ services:
         value: 1
     plan: free
     autoDeploy: true
-    healthCheckPath: /health
+    healthCheckPath: /healthz
     numInstances: 1
     env: python3.10
     disk:
