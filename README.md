@@ -1,75 +1,157 @@
-# SummaBrowse: Free Hosting Deployment Guide
+# SummaBrowse
 
-This guide will help you deploy your SummaBrowse app for free, with a live URL, using Render.com, Railway.app, or Fly.io. No credit card or payment required!
+**SummaBrowse** is a modern Flask application for extracting and summarizing content from PDFs, images, and videos.
 
----
-
-## 1. Prerequisites
-- A free account on [GitHub](https://github.com/)
-- A free account on [Render.com](https://render.com/), [Railway.app](https://railway.app/), or [Fly.io](https://fly.io/)
-- Your project code pushed to a GitHub repository
+It combines OCR, transcription, and AI-powered summarization to deliver clean, professional summaries from uploaded documents and media.
 
 ---
 
-## 2. Deploy on Render.com (Recommended for Simplicity)
+## 🚀 Key Features
 
-1. **Push your code to GitHub.**
-2. **Go to [Render.com](https://dashboard.render.com/)** and click "New +" → "Web Service".
-3. **Connect your GitHub repo.**
-4. **Select the Dockerfile option.**
-5. **Set the build and start commands:**
-   - Build Command: *(leave blank, Render uses Dockerfile)*
-   - Start Command: *(leave blank, Render uses Dockerfile)*
-6. **Set environment variables (optional):**
-   - HOST=0.0.0.0
-   - PORT=5000
-7. **Expose port 5000.**
-8. **Click "Create Web Service".**
-9. Wait for the build and deploy to finish. Your live URL will be shown at the top of the service page (e.g., `https://your-app-name.onrender.com`).
+- PDF text extraction with selectable-text support and OCR fallback
+- Image OCR using Tesseract
+- Video transcription using Whisper for local files and YouTube URLs
+- Multi-layer summarization:
+  - Gemini API if configured
+  - Local Hugging Face transformer model
+  - Pure-Python extractive fallback
+- Downloadable summary `.txt` outputs
+- Docker-ready deployment
 
 ---
 
-## 3. Deploy on Railway.app
+## 🧩 Project Structure
 
-1. **Push your code to GitHub.**
-2. **Go to [Railway.app](https://railway.app/)** and click "New Project" → "Deploy from GitHub repo".
-3. **Select your repo and let Railway auto-detect the Dockerfile.**
-4. **Set environment variables (optional):**
-   - HOST=0.0.0.0
-   - PORT=5000
-5. **Deploy!**
-6. Your live URL will be shown in the project dashboard (e.g., `https://your-app-name.up.railway.app`).
-
----
-
-## 4. Deploy on Fly.io
-
-1. **Install the [Fly.io CLI](https://fly.io/docs/hands-on/install-flyctl/).**
-2. **Run `fly launch` in your project directory.**
-3. **Follow the prompts (choose a name, region, etc.).**
-4. **Deploy with `fly deploy`.**
-5. Your live URL will be shown in the output (e.g., `https://your-app-name.fly.dev`).
+- `app.py` — Flask routes, upload/download handling, and UI endpoints
+- `app_factory.py` — singleton app container and lazy-loaded processors
+- `pdf_processor.py` — PDF parsing, OCR, and summary generation
+- `image_processor.py` — image OCR and summary generation
+- `video_processor.py` — video/audio extraction, transcription, and summarization
+- `utils.py` — shared utilities, Tesseract setup, markdown cleanup, and summarization orchestration
+- `templates/index.html` — front-end upload UI
+- `Dockerfile` — Docker build configuration
+- `requirements.txt` — Python dependencies
 
 ---
 
-## 5. Local Docker Test (Optional)
+## ⚙️ Prerequisites
 
-```sh
+- Python 3.10+
+- Tesseract OCR installed and available on the system path
+- `ffmpeg` installed for video/audio conversion
+- Optional: `GEMINI_API_KEY` for cloud-based summarization
+
+---
+
+## 💻 Local Installation
+
+1. Clone the repository:
+
+
+git clone https://github.com/ankit2003A/SummaBrowse.git
+cd SummaBrowse
+
+
+2. Create and activate a virtual environment:
+
+
+python -m venv .venv
+.venv\Scripts\Activate.ps1 # PowerShell
+
+# or
+
+.venv\Scripts\activate.bat # Command Prompt
+
+
+3. Install Python dependencies:
+
+
+pip install -r requirements.txt
+
+
+4. Install system tools:
+
+- Windows: install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
+- Linux/macOS: install `tesseract` and `ffmpeg` via your package manager
+
+5. Run the app:
+
+
+python app.py
+
+
+6. Open the web app:
+
+
+http://localhost:10000
+
+
+---
+
+## 🐳 Docker Deployment
+
+Build the Docker image:
+
+
 docker build -t summa-browse .
-docker run -p 5000:5000 summa-browse
-```
-Visit [http://localhost:5000](http://localhost:5000) to test locally.
+
+
+Run the container:
+
+
+docker run -p 10000:10000 summa-browse
+
+
+Then visit:
+
+
+http://localhost:10000
+
 
 ---
 
-## 6. No Database or Auth Needed
-- This app is stateless and file-based. No database or authentication is required for deployment.
+## ☁️ Deploying to Production
+
+This project is ready for deployment on Render, Railway, Fly.io, or any Docker-compatible environment.
+
+Recommended environment variables:
+
+- `HOST=0.0.0.0`
+- `PORT=10000`
+- `GEMINI_API_KEY` (optional)
 
 ---
 
-## 7. Need Help?
-- If you get stuck, check the platform’s documentation or ask for help!
+## 📌 Usage
+
+### Documents
+
+- Upload a PDF or image file
+- The app extracts text and produces a summary
+- Download the summary as a `.txt` file
+
+### Video
+
+- Submit a YouTube URL or upload a local video file
+- The app extracts audio, transcribes the speech, and summarizes the transcript
+- Download the generated summary
+
+> Note: YouTube downloading may require `cookies.txt` for restricted videos or additional browser cookies support.
 
 ---
 
-**Enjoy your free, live SummaBrowse app!** 
+## 🗂️ Output Locations
+
+- `uploads/` — uploaded files
+- `output/` — generated summary files
+- `downloads/` — temporary audio/video files
+
+---
+
+## 💡 Tips
+
+- Ensure Tesseract and FFmpeg are installed and working before processing files.
+- For the best summarization results, provide clean text or clear audio.
+- If you use YouTube processing, keep the video URL valid and accessible.
+
+---
