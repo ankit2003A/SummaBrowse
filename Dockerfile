@@ -13,7 +13,6 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
-    poppler-utils \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory

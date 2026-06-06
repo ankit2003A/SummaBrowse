@@ -1,7 +1,7 @@
 import os
 import pytesseract
 from PIL import Image
-from utils import setup_tesseract
+from utils import setup_tesseract, summarize_text
 
 class TextExtractorAndSummarizer:
     def __init__(self):
@@ -32,64 +32,9 @@ class TextExtractorAndSummarizer:
             print(f"Tesseract path: {pytesseract.pytesseract.tesseract_cmd}")
             return None
 
-    def generate_summary(self, text, max_length=130, min_length=30):
+    def generate_summary(self, text):
         """
-        Generate a simple summary by taking the first few sentences.
-        (For future: can integrate a transformer-based summarizer for higher accuracy.)
+        Generate a professional summary using the centralized utility.
         """
-        try:
-            # Split text into sentences
-            sentences = text.split('.')
-            
-            # Remove empty sentences
-            sentences = [s.strip() for s in sentences if s.strip()]
-            
-            if not sentences:
-                return "No text to summarize."
-            
-            # Take first few sentences as summary (30% of total sentences or at least 2 sentences)
-            num_sentences = max(2, min(len(sentences), max(min_length // 30, len(sentences) // 3)))
-            summary = '. '.join(sentences[:num_sentences]) + '.'
-            
-            return summary.strip()
-        except Exception as e:
-            print(f"Error generating summary: {str(e)}")
-            return None
-
-def main():
-    # Initialize the extractor and summarizer
-    extractor = TextExtractorAndSummarizer()
-    
-    # Get image path from user
-    image_path = input("Enter the path to your image: ")
-    
-    if not os.path.exists(image_path):
-        print("Error: Image file not found!")
-        return
-    
-    # Extract text from image
-    print("\nExtracting text from image...")
-    extracted_text = extractor.extract_text_from_image(image_path)
-    
-    if extracted_text:
-        print("\nExtracted Text:")
-        print("-" * 50)
-        print(extracted_text)
-        print("-" * 50)
-        
-        # Generate summary
-        print("\nGenerating summary...")
-        summary = extractor.generate_summary(extracted_text)
-        
-        if summary:
-            print("\nSummary:")
-            print("-" * 50)
-            print(summary)
-            print("-" * 50)
-        else:
-            print("Failed to generate summary.")
-    else:
-        print("Failed to extract text from the image.")
-
-if __name__ == "__main__":
-    main() 
+        return summarize_text(text)
+ 
