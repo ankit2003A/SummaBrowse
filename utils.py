@@ -106,46 +106,46 @@ def summarize_text(text):
             print("Using local Hugging Face transformer model for summarization...")
             try:
                 summarizer_pipeline = get_summarizer()
-            if summarizer_pipeline:
-                # Split text into chunks that the model can handle
-                max_chunk_size = 1000
-                chunks = [text[i:i+max_chunk_size] for i in range(0, len(text), max_chunk_size)]
-                
-                # Process in small batches to save memory
-                batch_size = 2
-                summaries = []
-                
-                for i in range(0, len(chunks), batch_size):
-                    batch = chunks[i:i+batch_size]
-                    try:
-                        # Get summaries for this batch
-                        batch_summaries = summarizer_pipeline(
-                            batch,
-                            max_length=150,
-                            min_length=30,
-                            do_sample=False,
-                            truncation=True
-                        )
-                        summaries.extend([s['summary_text'] for s in batch_summaries])
-                        
-                        # Clear memory
+                if summarizer_pipeline:
+                    # Split text into chunks that the model can handle
+                    max_chunk_size = 1000
+                    chunks = [text[i:i+max_chunk_size] for i in range(0, len(text), max_chunk_size)]
+                    
+                    # Process in small batches to save memory
+                    batch_size = 2
+                    summaries = []
+                    
+                    for i in range(0, len(chunks), batch_size):
+                        batch = chunks[i:i+batch_size]
                         try:
-                            import torch
-                            if torch.cuda.is_available():
-                                torch.cuda.empty_cache()
-                        except ImportError:
-                            pass
-                        
-                    except Exception as e:
-                        print(f"Error summarizing batch: {str(e)}")
-                        # Fallback for this chunk
-                        for chunk in batch:
-                            sentences = chunk.split('. ')
-                            summaries.append('. '.join(sentences[:2]) + '.')
-                
-                return " ".join(summaries)
-        except Exception as e:
-            print(f"Error in local transformer summarization: {str(e)}")
+                            # Get summaries for this batch
+                            batch_summaries = summarizer_pipeline(
+                                batch,
+                                max_length=150,
+                                min_length=30,
+                                do_sample=False,
+                                truncation=True
+                            )
+                            summaries.extend([s['summary_text'] for s in batch_summaries])
+                            
+                            # Clear memory
+                            try:
+                                import torch
+                                if torch.cuda.is_available():
+                                    torch.cuda.empty_cache()
+                            except ImportError:
+                                pass
+                            
+                        except Exception as e:
+                            print(f"Error summarizing batch: {str(e)}")
+                            # Fallback for this chunk
+                            for chunk in batch:
+                                sentences = chunk.split('. ')
+                                summaries.append('. '.join(sentences[:2]) + '.')
+                    
+                    return " ".join(summaries)
+            except Exception as e:
+                print(f"Error in local transformer summarization: {str(e)}")
 
     # 3. Smart Pure-Python Extractive Fallback (requires NO packages, runs instantly)
     print("Using smart term-frequency extractive summarizer fallback...")
