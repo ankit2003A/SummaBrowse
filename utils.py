@@ -100,9 +100,12 @@ def summarize_text(text):
 
     # 2. Try local transformer-based model (if transformers and torch are installed)
     if HAS_TRANSFORMERS:
-        print("Using local Hugging Face transformer model for summarization...")
-        try:
-            summarizer_pipeline = get_summarizer()
+        if os.environ.get("RENDER") == "true":
+            print("Running on Render: Skipping local transformer model to prevent Out-of-Memory (OOM) crashes.")
+        else:
+            print("Using local Hugging Face transformer model for summarization...")
+            try:
+                summarizer_pipeline = get_summarizer()
             if summarizer_pipeline:
                 # Split text into chunks that the model can handle
                 max_chunk_size = 1000
