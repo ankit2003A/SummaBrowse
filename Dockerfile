@@ -13,6 +13,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 # Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     tesseract-ocr \
+    ffmpeg \
     && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
@@ -22,7 +23,10 @@ WORKDIR /app
 COPY requirements.txt .
 
 # Install Python dependencies
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip "setuptools<82" wheel
+RUN echo "setuptools<82" > constraints.txt && \
+    PIP_CONSTRAINT=constraints.txt pip install --no-cache-dir -r requirements.txt && \
+    rm constraints.txt
 
 # Copy application code
 COPY . .

@@ -47,27 +47,27 @@ It combines OCR, transcription, and AI-powered summarization to deliver clean, p
 
 1. Clone the repository:
 
-
+```sh
 git clone https://github.com/ankit2003A/SummaBrowse.git
 cd SummaBrowse
-
+```
 
 2. Create and activate a virtual environment:
 
-
+```sh
 python -m venv .venv
 .venv\Scripts\Activate.ps1 # PowerShell
 
 # or
 
 .venv\Scripts\activate.bat # Command Prompt
-
+```
 
 3. Install Python dependencies:
 
-
+```sh
 pip install -r requirements.txt
-
+```
 
 4. Install system tools:
 
@@ -76,15 +76,15 @@ pip install -r requirements.txt
 
 5. Run the app:
 
-
+```sh
 python app.py
-
+```
 
 6. Open the web app:
 
-
+```sh
 http://localhost:10000
-
+```
 
 ---
 
@@ -92,21 +92,21 @@ http://localhost:10000
 
 Build the Docker image:
 
-
+```sh
 docker build -t summa-browse .
-
+```
 
 Run the container:
 
-
+```sh
 docker run -p 10000:10000 summa-browse
-
+```
 
 Then visit:
 
-
+```sh
 http://localhost:10000
-
+```
 
 ---
 
