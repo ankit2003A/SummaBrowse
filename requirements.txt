@@ -19,3 +19,4 @@ ffmpeg-python==0.2.0
 pydub==0.25.1
 openai-whisper==20231117
 flask-cors==4.0.0
+numpy<2
