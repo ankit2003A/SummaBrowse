@@ -1,157 +1,117 @@
 # SummaBrowse
 
-**SummaBrowse** is a modern Flask application for extracting and summarizing content from PDFs, images, and videos.
+**SummaBrowse** is a Flask app that extracts and summarizes content from PDFs, images and videos.
 
-It combines OCR, transcription, and AI-powered summarization to deliver clean, professional summaries from uploaded documents and media.
+Live demo: https://summabrowse.onrender.com
 
----
-
-## 🚀 Key Features
-
-- PDF text extraction with selectable-text support and OCR fallback
-- Image OCR using Tesseract
-- Video transcription using Whisper for local files and YouTube URLs
-- Multi-layer summarization:
-  - Gemini API if configured
-  - Local Hugging Face transformer model
-  - Pure-Python extractive fallback
-- Downloadable summary `.txt` outputs
-- Docker-ready deployment
+It combines OCR, YouTube captions, audio transcription and AI summarization to turn long documents and videos into clear summaries.
 
 ---
 
-## 🧩 Project Structure
+## Features
 
-- `app.py` — Flask routes, upload/download handling, and UI endpoints
-- `app_factory.py` — singleton app container and lazy-loaded processors
-- `pdf_processor.py` — PDF parsing, OCR, and summary generation
-- `image_processor.py` — image OCR and summary generation
-- `video_processor.py` — video/audio extraction, transcription, and summarization
-- `utils.py` — shared utilities, Tesseract setup, markdown cleanup, and summarization orchestration
-- `templates/index.html` — front-end upload UI
-- `Dockerfile` — Docker build configuration
-- `requirements.txt` — Python dependencies
-
----
-
-## ⚙️ Prerequisites
-
-- Python 3.10+
-- Tesseract OCR installed and available on the system path
-- `ffmpeg` installed for video/audio conversion
-- Optional: `GEMINI_API_KEY` for cloud-based summarization
+- **PDFs:** selectable-text extraction with an OCR fallback for scanned PDFs (PyMuPDF + Tesseract)
+- **Images:** OCR with Tesseract
+- **YouTube:** summarizes from the video's captions (no download needed)
+- **Video/audio uploads:** audio extracted with ffmpeg, transcribed with Gemini (or local Whisper)
+- **Summary length:** short, medium or detailed
+- **Summarization fallback chain:** Gemini → local BART model (optional) → pure-Python extractive summarizer; the UI shows which engine produced each summary
+- **Privacy:** uploads get random names and are deleted right after processing; summaries are never stored on the server (downloads are generated in the browser)
+- **Abuse protection:** per-IP rate limits, upload size and video length limits, restricted CORS
+- Docker-ready, deployed on Render
 
 ---
 
-## 💻 Local Installation
+## Project structure
 
-1. Clone the repository:
+| File | Purpose |
+| --- | --- |
+| `app.py` | Flask routes, upload handling, rate limiting, error handling |
+| `app_factory.py` | Singleton Flask app and lazily loaded processors |
+| `pdf_processor.py` | PDF text extraction and OCR fallback |
+| `image_processor.py` | Image OCR |
+| `video_processor.py` | YouTube captions, ffmpeg audio extraction, transcription |
+| `utils.py` | Summarization chain, Gemini client, Markdown cleanup |
+| `templates/index.html` | Front end |
+| `requirements.txt` | Lightweight runtime dependencies (used in Docker/Render) |
+| `requirements-local.txt` | Optional offline models (BART, Whisper, yt-dlp) |
+
+---
+
+## Running locally
+
+Prerequisites: Python 3.10+, `tesseract` and `ffmpeg` on your PATH.
 
 ```sh
-git clone https://github.com/ankit2003A/SummaBrowse.git
-cd SummaBrowse
-```
-
-2. Create and activate a virtual environment:
-
-```sh
+git clone https://github.com/ankit2003A/summabrowse.git
+cd summabrowse
 python -m venv .venv
-.venv\Scripts\Activate.ps1 # PowerShell
-
-# or
-
-.venv\Scripts\activate.bat # Command Prompt
-```
-
-3. Install Python dependencies:
-
-```sh
+source .venv/bin/activate        # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-4. Install system tools:
+Create a `.env` file:
 
-- Windows: install Tesseract from https://github.com/UB-Mannheim/tesseract/wiki
-- Linux/macOS: install `tesseract` and `ffmpeg` via your package manager
+```sh
+GEMINI_API_KEY=your-key-here
+```
 
-5. Run the app:
+Run it:
 
 ```sh
 python app.py
 ```
 
-6. Open the web app:
+Then open http://localhost:10000.
+
+### Fully offline mode (optional)
 
 ```sh
-http://localhost:10000
+pip install -r requirements-local.txt
+```
+
+Then add to `.env`:
+
+```sh
+ENABLE_LOCAL_MODELS=true       # BART summaries + Whisper transcription
+ENABLE_YTDLP_FALLBACK=true     # download audio for YouTube videos without captions
+```
+
+These models need several GB of RAM, so they're disabled on Render.
+
+---
+
+## Docker
+
+```sh
+docker build -t summabrowse .
+docker run -p 10000:10000 -e GEMINI_API_KEY=your-key-here summabrowse
 ```
 
 ---
 
-## 🐳 Docker Deployment
+## Configuration
 
-Build the Docker image:
-
-```sh
-docker build -t summa-browse .
-```
-
-Run the container:
-
-```sh
-docker run -p 10000:10000 summa-browse
-```
-
-Then visit:
-
-```sh
-http://localhost:10000
-```
+| Variable | Default | Description |
+| --- | --- | --- |
+| `GEMINI_API_KEY` | – | Enables Gemini summaries and transcription |
+| `GEMINI_MODEL` | `gemini-3.5-flash` | Gemini model name |
+| `MAX_UPLOAD_MB` | `25` | Maximum upload size |
+| `MAX_VIDEO_MINUTES` | `30` | Maximum video/audio length |
+| `MAX_OCR_PAGES` | `20` | Maximum scanned PDF pages to OCR |
+| `PROCESS_RATE_LIMIT` | `10 per hour;3 per minute` | Per-IP limit for documents |
+| `VIDEO_RATE_LIMIT` | `5 per hour;2 per minute` | Per-IP limit for videos |
+| `ALLOWED_ORIGINS` | – | Comma-separated origins allowed to call the API from other sites |
+| `ENABLE_LOCAL_MODELS` | `false` | Use local BART/Whisper |
+| `ENABLE_YTDLP_FALLBACK` | `false` | Download YouTube audio when a video has no captions |
+| `WEB_CONCURRENCY` | `1` | Gunicorn workers |
 
 ---
 
-## ☁️ Deploying to Production
+## Deploying to Render
 
-This project is ready for deployment on Render, Railway, Fly.io, or any Docker-compatible environment.
+The repo includes a `render.yaml` blueprint (Docker runtime, free plan, `/healthz` health check). Set `GEMINI_API_KEY` in the Render dashboard.
 
-Recommended environment variables:
+## Author
 
-- `HOST=0.0.0.0`
-- `PORT=10000`
-- `GEMINI_API_KEY` (optional)
-
----
-
-## 📌 Usage
-
-### Documents
-
-- Upload a PDF or image file
-- The app extracts text and produces a summary
-- Download the summary as a `.txt` file
-
-### Video
-
-- Submit a YouTube URL or upload a local video file
-- The app extracts audio, transcribes the speech, and summarizes the transcript
-- Download the generated summary
-
-> Note: YouTube downloading may require `cookies.txt` for restricted videos or additional browser cookies support.
-
----
-
-## 🗂️ Output Locations
-
-- `uploads/` — uploaded files
-- `output/` — generated summary files
-- `downloads/` — temporary audio/video files
-
----
-
-## 💡 Tips
-
-- Ensure Tesseract and FFmpeg are installed and working before processing files.
-- For the best summarization results, provide clean text or clear audio.
-- If you use YouTube processing, keep the video URL valid and accessible.
-
----
+Built by [Ankit Verma](https://www.linkedin.com/in/ankit-verma01).

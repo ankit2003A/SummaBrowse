@@ -1,20 +1,17 @@
-# Gunicorn configuration file
-import multiprocessing
+import os
 
-# Server socket
-bind = "0.0.0.0:10000"
+# Render sets $PORT; default to 10000 for local Docker runs.
+bind = f"0.0.0.0:{os.environ.get('PORT', '10000')}"
 
-# Worker processes
-workers = 2
-threads = 2
-worker_class = 'gthread'
-worker_connections = 1000
+# One worker keeps memory low on Render's 512 MB free instance; threads handle concurrency.
+workers = int(os.environ.get("WEB_CONCURRENCY", "1"))
+threads = int(os.environ.get("GUNICORN_THREADS", "4"))
+worker_class = "gthread"
 
-# Logging
-accesslog = '-'
-errorlog = '-'
-loglevel = 'info'
-
-# Timeouts
-timeout = 120
+# Video transcription can take a few minutes.
+timeout = int(os.environ.get("GUNICORN_TIMEOUT", "300"))
 keepalive = 5
+
+accesslog = "-"
+errorlog = "-"
+loglevel = "info"

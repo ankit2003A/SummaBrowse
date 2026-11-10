@@ -1,0 +1,10 @@
+# Optional extras for running fully offline on your own machine.
+# Install with: pip install -r requirements.txt -r requirements-local.txt
+# Then set ENABLE_LOCAL_MODELS=true (and ENABLE_YTDLP_FALLBACK=true for YouTube videos without captions).
+# Not used on Render: the free instance (512 MB RAM) can't hold these models.
+transformers>=4.40
+torch>=2.2
+sentencepiece>=0.2
+openai-whisper>=20240930
+yt-dlp>=2025.1.1
+numpy<2
