@@ -16,7 +16,7 @@ import tempfile
 import uuid
 from urllib.parse import urlparse, parse_qs
 
-from utils import summarize, gemini_generate
+from utils import summarize, gemini_generate, length_instruction
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,7 @@ class VideoProcessor:
             TranscriptsDisabled, NoTranscriptFound, VideoUnavailable, RequestBlocked, IpBlocked,
         )
 
+        blocked, no_captions = False, False
         try:
             transcript = self.fetch_youtube_transcript(video_id)
         except (TranscriptsDisabled, NoTranscriptFound, StopIteration):
@@ -92,10 +93,10 @@ class VideoProcessor:
             return error("This video is unavailable or private.")
         except (RequestBlocked, IpBlocked):
             logger.warning("YouTube blocked transcript request for %s", video_id)
-            return error("YouTube is temporarily blocking requests from this server. Please try again later, or upload the video file instead.", 503)
+            transcript, blocked = None, True
         except Exception:
             logger.exception("Transcript fetch failed for %s", video_id)
-            return error("Couldn't fetch this video's transcript. Please try again later.", 502)
+            transcript, blocked = None, True
         else:
             no_captions = False
 
@@ -103,8 +104,17 @@ class VideoProcessor:
             summary, engine = summarize(transcript, length)
             return {"summary": summary, "engine": engine, "source": "captions"}
 
-        # No captions: optional audio download fallback (off by default; YouTube
-        # blocks most datacenter IPs, so this is mainly useful when running locally).
+        # Captions unavailable (no captions, or YouTube is blocking this server):
+        # let Gemini watch the public video directly from its URL.
+        if os.environ.get("GEMINI_API_KEY"):
+            try:
+                summary = self.summarize_youtube_with_gemini(video_id, length)
+                return {"summary": summary, "engine": "gemini", "source": "video"}
+            except Exception as e:
+                logger.error("Gemini YouTube summarization failed for %s: %s", video_id, e)
+
+        # Optional audio download fallback (off by default; YouTube blocks most
+        # datacenter IPs, so this is mainly useful when running locally).
         if env_flag("ENABLE_YTDLP_FALLBACK"):
             audio_path = None
             try:
@@ -115,9 +125,22 @@ class VideoProcessor:
             finally:
                 self._remove(audio_path)
 
+        if blocked:
+            return error("YouTube is temporarily blocking requests from this server. Please try again later, or upload the video file instead.", 503)
         if no_captions:
-            return error("This video has no captions, so it can't be summarized from YouTube. Try uploading the video file instead.")
+            return error("This video has no captions and couldn't be summarized. Make sure it's public, or upload the video file instead.")
         return error("Couldn't get a transcript for this video.")
+
+    def summarize_youtube_with_gemini(self, video_id, length):
+        prompt = (
+            "Summarize this video. " + length_instruction(length) +
+            " Use Markdown formatting. Do not include raw HTML. "
+            "Start directly with the summary itself: no preamble such as 'Here is a summary'."
+        )
+        return gemini_generate([
+            {"file_data": {"file_uri": f"https://www.youtube.com/watch?v={video_id}"}},
+            {"text": prompt},
+        ], timeout=280)
 
     def download_youtube_audio(self, video_id):
         import yt_dlp

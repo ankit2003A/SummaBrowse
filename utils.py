@@ -85,12 +85,17 @@ def gemini_generate(parts, timeout=60):
     return data["candidates"][0]["content"]["parts"][0]["text"].strip()
 
 
+def length_instruction(length):
+    return LENGTHS[normalize_length(length)]["instruction"]
+
+
 def _summarize_gemini(text, length):
     if len(text) > MAX_INPUT_CHARS:
         text = text[:MAX_INPUT_CHARS] + "\n\n[Text truncated for length]"
     prompt = (
         "You are a professional summary generator. Analyze the following text and summarize it. "
-        f"{LENGTHS[length]['instruction']} Use Markdown formatting. Do not include raw HTML.\n\n"
+        f"{LENGTHS[length]['instruction']} Use Markdown formatting. Do not include raw HTML. "
+        "Start directly with the summary itself: no preamble such as 'Here is a summary'.\n\n"
         f"Text:\n{text}"
     )
     return gemini_generate([{"text": prompt}])

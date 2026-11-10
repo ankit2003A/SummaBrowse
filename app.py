@@ -103,7 +103,11 @@ def healthz():
 
 @app.route("/")
 def index():
-    return render_template("index.html", max_upload_mb=MAX_UPLOAD_MB)
+    return render_template(
+        "index.html",
+        max_upload_mb=MAX_UPLOAD_MB,
+        max_video_minutes=int(os.environ.get("MAX_VIDEO_MINUTES", "30")),
+    )
 
 
 @app.route("/process", methods=["POST"])
