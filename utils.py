@@ -1,13 +1,21 @@
 import os
+import re
+import logging
+from collections import Counter
 
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Tesseract
+# ---------------------------------------------------------------------------
 tesseract_paths = [
     '/usr/bin/tesseract',
     '/usr/local/bin/tesseract',
-    r'C:\Program Files\Tesseract-OCR\tesseract.exe',  # Your Tesseract installation path
     r'C:\Program Files\Tesseract-OCR\tesseract.exe',
     r'C:\Program Files (x86)\Tesseract-OCR\tesseract.exe',
-    r'C:\Tesseract-OCR\tesseract.exe'
+    r'C:\Tesseract-OCR\tesseract.exe',
 ]
+
 
 def find_tesseract():
     for path in tesseract_paths:
@@ -15,180 +23,151 @@ def find_tesseract():
             return path
     return None
 
+
 def setup_tesseract(pytesseract):
     tesseract_path = find_tesseract()
     if tesseract_path:
         pytesseract.pytesseract.tesseract_cmd = tesseract_path
     else:
-        print("Warning: Tesseract not found in common locations.")
-        print("Please install Tesseract from: https://github.com/UB-Mannheim/tesseract/wiki")
-        print("Expected locations:")
-        for path in tesseract_paths:
-            print(f"- {path}")
+        logger.warning("Tesseract not found in common locations; relying on PATH.")
 
+
+# ---------------------------------------------------------------------------
+# Markdown helpers
+# ---------------------------------------------------------------------------
 def clean_markdown(text):
-    import re
-    # 1. Remove bold/italic markers (**bold** or *italic*)
+    """Convert Markdown to plain text for the downloadable .txt file."""
     text = re.sub(r'\*\*+(.*?)\*\*+', r'\1', text)
     text = re.sub(r'\*+(.*?)\*+', r'\1', text)
-    # 2. Remove headers (### Header -> Header)
     text = re.sub(r'(?m)^#{1,6}\s+(.*?)\s*$', r'\1', text)
-    # 3. Remove horizontal rules (---)
     text = re.sub(r'(?m)^[-*_]{3,}\s*$', r'', text)
-    # 4. Remove links ([text](url) -> text)
     text = re.sub(r'\[(.*?)\]\(.*?\)', r'\1', text)
-    # 5. Clean up multiple empty lines
     text = re.sub(r'\n{3,}', r'\n\n', text)
     return text.strip()
 
-# Lazy-loaded Transformers check and pipeline
-try:
-    from transformers import pipeline
-    HAS_TRANSFORMERS = True
-except ImportError:
-    HAS_TRANSFORMERS = False
+
+# ---------------------------------------------------------------------------
+# Summarization
+# ---------------------------------------------------------------------------
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-3.5-flash")
+GEMINI_API_BASE = os.environ.get("GEMINI_API_BASE", "https://generativelanguage.googleapis.com/v1beta")
+# Cap on characters sent to the LLM so huge PDFs don't blow the request size / timeout.
+MAX_INPUT_CHARS = int(os.environ.get("MAX_INPUT_CHARS", "120000"))
+
+LENGTHS = {
+    "short": {"instruction": "Write a short summary of about 3-5 bullet points.", "sentences": 3, "bart_max": 80},
+    "medium": {"instruction": "Write a structured summary with a one-line overview, the main points as bullets, and a short conclusion.", "sentences": 6, "bart_max": 150},
+    "long": {"instruction": "Write a detailed, structured summary with headings, covering every key concept, argument, figure and conclusion.", "sentences": 12, "bart_max": 250},
+}
+
+
+def normalize_length(length):
+    return length if length in LENGTHS else "medium"
+
+
+def gemini_headers():
+    return {
+        "Content-Type": "application/json",
+        # Send the key as a header, not a URL query param, so it never lands in access logs.
+        "x-goog-api-key": os.environ.get("GEMINI_API_KEY", ""),
+    }
+
+
+def gemini_generate(parts, timeout=60):
+    """Call Gemini generateContent. Returns text or raises."""
+    import requests
+
+    url = f"{GEMINI_API_BASE}/models/{GEMINI_MODEL}:generateContent"
+    response = requests.post(url, headers=gemini_headers(), json={"contents": [{"parts": parts}]}, timeout=timeout)
+    if response.status_code != 200:
+        raise RuntimeError(f"Gemini API returned {response.status_code}: {response.text[:300]}")
+    data = response.json()
+    return data["candidates"][0]["content"]["parts"][0]["text"].strip()
+
+
+def _summarize_gemini(text, length):
+    if len(text) > MAX_INPUT_CHARS:
+        text = text[:MAX_INPUT_CHARS] + "\n\n[Text truncated for length]"
+    prompt = (
+        "You are a professional summary generator. Analyze the following text and summarize it. "
+        f"{LENGTHS[length]['instruction']} Use Markdown formatting. Do not include raw HTML.\n\n"
+        f"Text:\n{text}"
+    )
+    return gemini_generate([{"text": prompt}])
+
 
 _summarizer = None
 
-def get_summarizer():
+
+def _summarize_transformers(text, length):
     global _summarizer
-    if _summarizer is None and HAS_TRANSFORMERS:
-        print("Loading summarization model...")
-        from transformers import pipeline
+    from transformers import pipeline  # noqa: imported lazily; heavy
+
+    if _summarizer is None:
+        logger.info("Loading local BART summarization model...")
         _summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
-        
-        # Reduce memory usage
-        try:
-            import torch
-            if torch.cuda.is_available():
-                torch.cuda.empty_cache()
-        except ImportError:
-            pass
-    return _summarizer
 
-def summarize_text(text):
-    if not text or not text.strip():
-        return "No text to summarize"
+    max_len = LENGTHS[length]["bart_max"]
+    chunks = [text[i:i + 1000] for i in range(0, min(len(text), 20000), 1000)]
+    summaries = []
+    for i in range(0, len(chunks), 2):
+        batch = chunks[i:i + 2]
+        out = _summarizer(batch, max_length=max_len, min_length=min(30, max_len // 2), do_sample=False, truncation=True)
+        summaries.extend(s["summary_text"] for s in out)
+    return " ".join(summaries)
 
-    # 1. Try Gemini API first (highly professional, fast, lightweight, and memory-safe)
-    api_key = os.environ.get("GEMINI_API_KEY")
-    if api_key:
-        print("Using cloud-based Gemini API for professional summarization...")
-        import requests
-        try:
-            url = f"https://generativelanguage.googleapis.com/v1/models/gemini-3.5-flash:generateContent?key={api_key}"
-            headers = {'Content-Type': 'application/json'}
-            prompt = (
-                "You are a professional summary generator. Please analyze the following text and provide "
-                "a professional, structured summary highlighting key concepts, main points, and conclusions.\n\n"
-                f"Text:\n{text}"
-            )
-            data = {
-                "contents": [{
-                    "parts": [{"text": prompt}]
-                }]
-            }
-            response = requests.post(url, headers=headers, json=data, timeout=30)
-            if response.status_code == 200:
-                res_json = response.json()
-                summary = res_json['candidates'][0]['content']['parts'][0]['text']
-                return summary.strip()
-            else:
-                print(f"Gemini API returned status code {response.status_code}: {response.text}")
-        except Exception as e:
-            print(f"Error calling Gemini API: {str(e)}")
 
-    # 2. Try local transformer-based model (if transformers and torch are installed)
-    if HAS_TRANSFORMERS:
-        if os.environ.get("RENDER") == "true":
-            print("Running on Render: Skipping local transformer model to prevent Out-of-Memory (OOM) crashes.")
-        else:
-            print("Using local Hugging Face transformer model for summarization...")
-            try:
-                summarizer_pipeline = get_summarizer()
-                if summarizer_pipeline:
-                    # Split text into chunks that the model can handle
-                    max_chunk_size = 1000
-                    chunks = [text[i:i+max_chunk_size] for i in range(0, len(text), max_chunk_size)]
-                    
-                    # Process in small batches to save memory
-                    batch_size = 2
-                    summaries = []
-                    
-                    for i in range(0, len(chunks), batch_size):
-                        batch = chunks[i:i+batch_size]
-                        try:
-                            # Get summaries for this batch
-                            batch_summaries = summarizer_pipeline(
-                                batch,
-                                max_length=150,
-                                min_length=30,
-                                do_sample=False,
-                                truncation=True
-                            )
-                            summaries.extend([s['summary_text'] for s in batch_summaries])
-                            
-                            # Clear memory
-                            try:
-                                import torch
-                                if torch.cuda.is_available():
-                                    torch.cuda.empty_cache()
-                            except ImportError:
-                                pass
-                            
-                        except Exception as e:
-                            print(f"Error summarizing batch: {str(e)}")
-                            # Fallback for this chunk
-                            for chunk in batch:
-                                sentences = chunk.split('. ')
-                                summaries.append('. '.join(sentences[:2]) + '.')
-                    
-                    return " ".join(summaries)
-            except Exception as e:
-                print(f"Error in local transformer summarization: {str(e)}")
+STOPWORDS = {
+    'the', 'and', 'that', 'this', 'with', 'from', 'your', 'have', 'about', 'they', 'will', 'been', 'were',
+    'which', 'their', 'there', 'would', 'could', 'should', 'into', 'than', 'then', 'them', 'these', 'those',
+    'also', 'what', 'when', 'where', 'while', 'some', 'such', 'only', 'other', 'more', 'most', 'very',
+}
 
-    # 3. Smart Pure-Python Extractive Fallback (requires NO packages, runs instantly)
-    print("Using smart term-frequency extractive summarizer fallback...")
-    try:
-        import re
-        from collections import Counter
-        # Split text into sentences
-        sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?)\s', text)
-        sentences = [s.strip() for s in sentences if s.strip()]
-        if len(sentences) <= 4:
-            return text
-        
-        # Tokenize and count word frequencies
-        words = re.findall(r'\b[a-zA-Z]{4,}\b', text.lower())
-        stopwords = {'the', 'and', 'a', 'to', 'of', 'in', 'is', 'that', 'it', 'for', 'on', 'with', 'as', 'this', 'but', 'by', 'not', 'or', 'be', 'are', 'from', 'at', 'an', 'your', 'have', 'about', 'they', 'will', 'been', 'were'}
-        filtered_words = [w for w in words if w not in stopwords]
-        word_frequencies = Counter(filtered_words)
-        
-        # Score sentences
-        sentence_scores = []
-        for s in sentences:
-            score = 0
-            s_words = re.findall(r'\b[a-zA-Z]{4,}\b', s.lower())
-            for w in s_words:
-                if w in word_frequencies:
-                    score += word_frequencies[w]
-            sentence_scores.append(score)
-        
-        # Pick the top sentences (e.g. 20% of sentences or at least 3, at most 8)
-        num_summary_sentences = max(3, min(len(sentences) // 5, 8))
-        
-        # Get indices of top scoring sentences
-        top_indices = sorted(range(len(sentence_scores)), key=lambda i: sentence_scores[i], reverse=True)[:num_summary_sentences]
-        # Sort indices chronologically to maintain document flow
-        top_indices.sort()
-        
-        return " ".join([sentences[i] for i in top_indices])
-    except Exception as e:
-        print(f"Error in simple extractive fallback: {str(e)}")
 
-    # 4. Final basic fallback (first few sentences)
-    print("Using basic fallback summarizer...")
-    sentences = text.split('.')
+def _summarize_extractive(text, length):
+    sentences = re.split(r'(?<!\w\.\w.)(?<![A-Z][a-z]\.)(?<=\.|\?|!)\s', text)
     sentences = [s.strip() for s in sentences if s.strip()]
-    num_sentences = max(2, min(len(sentences), max(2, len(sentences) // 3)))
-    return '. '.join(sentences[:num_sentences]) + '.'
+    target = LENGTHS[length]["sentences"]
+    if len(sentences) <= target:
+        return text.strip()
+
+    words = [w for w in re.findall(r'\b[a-zA-Z]{4,}\b', text.lower()) if w not in STOPWORDS]
+    freq = Counter(words)
+    scores = []
+    for s in sentences:
+        s_words = re.findall(r'\b[a-zA-Z]{4,}\b', s.lower())
+        # Normalise by length so long sentences don't always win.
+        scores.append(sum(freq.get(w, 0) for w in s_words) / (len(s_words) ** 0.5 or 1))
+
+    top = sorted(range(len(sentences)), key=lambda i: scores[i], reverse=True)[:target]
+    top.sort()
+    return " ".join(sentences[i] for i in top)
+
+
+def summarize(text, length="medium"):
+    """
+    Summarize text, trying Gemini -> local transformer -> extractive fallback.
+    Returns (summary, engine) so the UI can show which engine produced it.
+    """
+    length = normalize_length(length)
+    if not text or not text.strip():
+        return "No text to summarize.", "none"
+
+    if os.environ.get("GEMINI_API_KEY"):
+        try:
+            return _summarize_gemini(text, length), "gemini"
+        except Exception as e:
+            logger.error("Gemini summarization failed: %s", e)
+
+    if os.environ.get("ENABLE_LOCAL_MODELS", "false").lower() == "true":
+        try:
+            return _summarize_transformers(text, length), "bart"
+        except Exception as e:
+            logger.error("Local transformer summarization failed: %s", e)
+
+    return _summarize_extractive(text, length), "extractive"
+
+
+def summarize_text(text, length="medium"):
+    """Backwards-compatible helper returning only the summary string."""
+    return summarize(text, length)[0]

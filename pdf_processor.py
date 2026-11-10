@@ -1,64 +1,49 @@
+import io
 import os
-import pytesseract
+import logging
+
 import fitz  # PyMuPDF
+import pytesseract
+from PIL import Image
+
 from utils import setup_tesseract, summarize_text
 
+logger = logging.getLogger(__name__)
+
+# OCR is slow and memory-hungry on a small instance, so cap the pages we OCR.
+MAX_OCR_PAGES = int(os.environ.get("MAX_OCR_PAGES", "20"))
+MAX_PDF_PAGES = int(os.environ.get("MAX_PDF_PAGES", "300"))
+
+
 class PDFProcessor:
-    def __init__(self, output_folder="output"):
+    def __init__(self):
         setup_tesseract(pytesseract)
-        self.output_folder = output_folder
-        os.makedirs(self.output_folder, exist_ok=True)
 
     def extract_text_with_ocr(self, pdf_path):
-        text = ""
-        try:
-            # First try to extract text directly
-            doc = fitz.open(pdf_path)
-            for page_num in range(len(doc)):
+        """Extract selectable text; fall back to OCR for scanned PDFs."""
+        with fitz.open(pdf_path) as doc:
+            page_count = min(len(doc), MAX_PDF_PAGES)
+            parts = []
+            for page_num in range(page_count):
                 try:
-                    page = doc.load_page(page_num)
-                    extracted_text = page.get_text()
-                    if extracted_text:
-                        text += extracted_text + "\n"
-                    # Clear memory after each page
-                    import gc
-                    del page
-                    gc.collect()
+                    parts.append(doc.load_page(page_num).get_text())
                 except Exception as e:
-                    print(f"Error on page {page_num + 1}: {str(e)}")
-                    continue
-                    
-            # If no text found, try OCR using PyMuPDF to convert pages to images
+                    logger.warning("Text extraction failed on page %d: %s", page_num + 1, e)
+            text = "\n".join(p for p in parts if p)
+
             if not text.strip():
-                print("[OCR] No selectable text found, using OCR (via PyMuPDF)...")
-                import io
-                from PIL import Image
-                for page_num in range(len(doc)):
+                logger.info("No selectable text found; running OCR on up to %d pages", MAX_OCR_PAGES)
+                parts = []
+                for page_num in range(min(len(doc), MAX_OCR_PAGES)):
                     try:
-                        page = doc.load_page(page_num)
-                        pix = page.get_pixmap(dpi=150)  # Lower DPI for memory efficiency
-                        img_data = pix.tobytes("png")
-                        img = Image.open(io.BytesIO(img_data))
-                        
-                        text += pytesseract.image_to_string(img) + "\n"
-                        
-                        # Clear memory after each page
-                        del img
-                        del pix
-                        if page_num % 5 == 0:
-                            import gc
-                            gc.collect()
+                        pix = doc.load_page(page_num).get_pixmap(dpi=150)
+                        with Image.open(io.BytesIO(pix.tobytes("png"))) as img:
+                            parts.append(pytesseract.image_to_string(img))
                     except Exception as e:
-                        print(f"Error in OCR for page {page_num + 1}: {str(e)}")
-                        continue
-            
-            doc.close()
-            return text.strip() if text.strip() else None
-            
-        except Exception as e:
-            print(f"Error extracting text: {e}")
-            raise e
+                        logger.warning("OCR failed on page %d: %s", page_num + 1, e)
+                text = "\n".join(parts)
 
-    def summarize_text(self, text):
-        return summarize_text(text)
+        return text.strip() or None
 
+    def summarize_text(self, text, length="medium"):
+        return summarize_text(text, length)

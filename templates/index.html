@@ -4,8 +4,14 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  <title>SummaBrowse - PDF/Image Summarizer</title>
-  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <title>SummaBrowse - PDF, Image &amp; Video Summarizer</title>
+  <meta name="description" content="Summarize PDFs, images and videos with AI. Upload a document or paste a YouTube link and get a clear summary in seconds.">
+  <meta property="og:title" content="SummaBrowse - AI Summarizer for PDFs, Images and Videos">
+  <meta property="og:description" content="Upload a PDF or image, or paste a YouTube link, and get a concise AI summary in seconds.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
   <style>
     /* Google Fonts import */
     @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700&display=swap');
@@ -848,6 +854,53 @@
       color: var(--primary);
       text-decoration: none;
     }
+    /* Summary length selector, engine badge, wake-up notice */
+    .options-bar {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin: 0 0 20px;
+      flex-wrap: wrap;
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+    }
+    .length-options {
+      display: inline-flex;
+      border: 1px solid var(--input-border);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+    .length-options button {
+      background: transparent;
+      border: none;
+      padding: 6px 16px;
+      color: var(--text-color);
+      font: inherit;
+      cursor: pointer;
+    }
+    .length-options button.active {
+      background: var(--primary);
+      color: #fff;
+    }
+    .engine-badge {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 2px 10px;
+      border-radius: 999px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      vertical-align: middle;
+      background: var(--input-bg);
+      border: 1px solid var(--input-border);
+      color: var(--text-secondary);
+    }
+    .wake-note {
+      display: none;
+      margin-top: 8px;
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+    }
   </style>
 </head>
 <body>
@@ -882,6 +935,15 @@
         <button class="tab-link" id="videoTabBtn"><i class="fas fa-video"></i> Video Processor</button>
       </div>
 
+      <div class="options-bar">
+        <span>Summary length:</span>
+        <div class="length-options" role="radiogroup" aria-label="Summary length">
+          <button type="button" data-length="short" role="radio" aria-checked="false">Short</button>
+          <button type="button" data-length="medium" class="active" role="radio" aria-checked="true">Medium</button>
+          <button type="button" data-length="long" role="radio" aria-checked="false">Detailed</button>
+        </div>
+      </div>
+
       <!-- Tab 1: Documents & Images -->
       <div id="docTab" class="tab-content">
         <div class="upload-section">
@@ -889,7 +951,7 @@
             <label for="fileInput">
                 <i class="fas fa-cloud-upload-alt"></i>
                 <p>Click to upload an image or PDF, or drag and drop</p>
-                <p class="file-limits">Supported formats: PNG, JPG, JPEG, PDF</p>
+                <p class="file-limits">Supported formats: PDF, PNG, JPG, WEBP · up to {{ max_upload_mb }} MB</p>
             </label>
         </div>
 
@@ -898,6 +960,7 @@
         <div class="loading">
             <div class="loading-spinner"></div>
             <p>Processing your file...</p>
+            <p class="wake-note">The server sleeps when idle, so the first request can take up to a minute.</p>
         </div>
 
         <div class="results" id="results">
@@ -910,7 +973,7 @@
                 <button id="readMoreBtn" class="read-more-btn" style="display: none;">Read Full</button>
             </div>
             <div class="result-section">
-                <h2><i class="fas fa-file-alt"></i> Summary</h2>
+                <h2><i class="fas fa-file-alt"></i> Summary <span class="engine-badge" id="engineBadge"></span></h2>
                 <div id="summary"></div>
             </div>
             <div class="result-section" style="text-align: center; background: transparent; border: none; box-shadow: none; padding: 0;">
@@ -922,7 +985,7 @@
       <!-- Tab 2: Video Processor -->
       <div id="videoTab" class="tab-content" style="display: none;">
         <section id="video-processing">
-          <p class="section-desc">Extract key insights from YouTube videos or local video uploads.</p>
+          <p class="section-desc">Summarize a YouTube video from its captions, or upload a video or audio file (up to {{ max_upload_mb }} MB, 30 minutes).</p>
           
           <div class="video-source-selector">
             <div class="video-tabs">
@@ -946,7 +1009,7 @@
 
           <div id="localInput" style="display: none;">
             <div class="file-select-container">
-              <input type="file" id="localVideoFile" name="file" accept="video/*" class="custom-file-input">
+              <input type="file" id="localVideoFile" name="file" accept="video/*,audio/*" class="custom-file-input">
               <label for="localVideoFile" class="custom-file-label">
                 <i class="fas fa-file-video"></i>
                 <span>Choose Video File</span>
@@ -960,13 +1023,14 @@
           <div class="loading" id="videoLoading" style="display: none;">
             <div class="loading-spinner"></div>
             <p>Processing your video...</p>
+            <p class="wake-note">The server sleeps when idle, so the first request can take up to a minute. Longer videos take a few minutes.</p>
           </div>
 
           <div class="error" id="videoError" style="display: none;"></div>
 
           <div class="results" id="videoResults">
             <div class="result-section" id="videoSummarySection" style="display: none;">
-                <h2><i class="fas fa-video"></i> Video Summary</h2>
+                <h2><i class="fas fa-video"></i> Video Summary <span class="engine-badge" id="videoEngineBadge"></span></h2>
                 <div id="videoSummary"></div>
             </div>
             <div class="result-section" style="text-align: center; background: transparent; border: none; box-shadow: none; padding: 0;">
@@ -983,7 +1047,7 @@
       <div class="steps">
         <div>
           <h3>1. Upload Your File</h3>
-          <p>Insert, paste, or upload your PDF or image file.</p>
+          <p>Upload a PDF or image, or paste a YouTube link.</p>
         </div>
         <div>
           <h3>2. Process the File</h3>
@@ -991,7 +1055,7 @@
         </div>
         <div>
           <h3>3. Adjust Summary</h3>
-          <p>Customize the summary length to suit your needs.</p>
+          <p>Pick a short, medium or detailed summary.</p>
         </div>
         <div>
           <h3>4. Download Summary</h3>
@@ -1007,36 +1071,36 @@
         <div class="feature-card">
           <i class="fas fa-check-circle"></i>
           <div>
-            <h3>100% Free</h3>
-            <p>Generate unlimited summaries without paying a penny.</p>
+            <h3>Free</h3>
+            <p>No sign-up and no payment needed.</p>
           </div>
         </div>
         <div class="feature-card">
           <i class="fas fa-check-circle"></i>
           <div>
             <h3>Accurate</h3>
-            <p>Get reliable and trustworthy summaries built on advanced algorithms.</p>
+            <p>Summaries come from Google Gemini, with an offline fallback if it is unavailable.</p>
           </div>
         </div>
         <div class="feature-card">
           <i class="fas fa-check-circle"></i>
           <div>
             <h3>Secure</h3>
-            <p>No data is stored permanently, ensuring complete user privacy.</p>
+            <p>Uploaded files are deleted right after processing. Summaries are never stored on the server.</p>
           </div>
         </div>
         <div class="feature-card">
           <i class="fas fa-check-circle"></i>
           <div>
             <h3>Fast</h3>
-            <p>Get concise summaries within seconds, thanks to optimized pipeline.</p>
+            <p>Most documents are summarized in a few seconds.</p>
           </div>
         </div>
         <div class="feature-card">
           <i class="fas fa-check-circle"></i>
           <div>
             <h3>Flexible</h3>
-            <p>Adapts to custom workflows, formats, files, and video lengths.</p>
+            <p>Works with text PDFs, scanned PDFs, images, YouTube links and video or audio files.</p>
           </div>
         </div>
       </div>
@@ -1044,9 +1108,9 @@
 
     <!-- About section -->
     <section id="about">
-      <h2>About Us</h2>
+      <h2>About</h2>
       <div class="about-card">
-        <p>We are a team of passionate developers and AI enthusiasts dedicated to making information more accessible. Our goal is to help you save time and effort by providing quick and accurate summaries of your documents and media files.</p>
+        <p>SummaBrowse is built by <a href="https://www.linkedin.com/in/ankit-verma01" target="_blank" rel="noopener">Ankit Verma</a>. It combines OCR (Tesseract), YouTube captions and Gemini to turn long documents and videos into clear summaries. The source code is on <a href="https://github.com/ankit2003A/summabrowse" target="_blank" rel="noopener">GitHub</a>.</p>
       </div>
     </section>
   </main>
@@ -1054,16 +1118,75 @@
   <!-- Footer -->
   <footer>
     <p>
-      <a href="#terms">Terms of Use</a> |
-      <a href="#cookies">Cookie Preferences</a> |
-      <a href="#privacy">Privacy Policy</a> |
-      <a href="#happiness">Happiness Guarantee</a>
+      <a href="https://github.com/ankit2003A/summabrowse" target="_blank" rel="noopener">GitHub</a> |
+      <a href="https://www.linkedin.com/in/ankit-verma01" target="_blank" rel="noopener">LinkedIn</a>
     </p>
-    <p>&copy; 2025 SummaBrowse. All rights reserved.</p>
+    <p>&copy; 2026 SummaBrowse by Ankit Verma</p>
   </footer>
 
 
   <script>
+    const MAX_UPLOAD_BYTES = {{ max_upload_mb }} * 1024 * 1024;
+    const ENGINE_LABELS = { gemini: 'Gemini', bart: 'BART (local)', extractive: 'Basic extractive', none: '' };
+    let summaryLength = 'medium';
+
+    document.querySelectorAll('.length-options button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.length-options button').forEach(b => {
+          b.classList.remove('active');
+          b.setAttribute('aria-checked', 'false');
+        });
+        btn.classList.add('active');
+        btn.setAttribute('aria-checked', 'true');
+        summaryLength = btn.dataset.length;
+      });
+    });
+
+    // Render model output as Markdown, sanitized so injected HTML/scripts can't run.
+    function renderMarkdown(el, md) {
+      el.innerHTML = DOMPurify.sanitize(marked.parse(md || ''));
+    }
+
+    function setEngineBadge(el, engine, source) {
+      const label = ENGINE_LABELS[engine] || '';
+      el.textContent = label ? (source === 'captions' ? label + ' · from captions' : label) : '';
+      el.style.display = label ? 'inline-block' : 'none';
+    }
+
+    // Build the .txt download in the browser so nothing is stored on the server.
+    function setDownload(link, text, filename) {
+      if (link.dataset.url) URL.revokeObjectURL(link.dataset.url);
+      const url = URL.createObjectURL(new Blob([text], { type: 'text/plain;charset=utf-8' }));
+      link.dataset.url = url;
+      link.href = url;
+      link.download = filename;
+      link.style.display = 'inline-flex';
+    }
+
+    // Show a "server is waking up" hint if a request takes a while (Render free tier).
+    function startWakeTimer(container) {
+      const note = container.querySelector('.wake-note');
+      if (note) note.style.display = 'none';
+      return setTimeout(() => { if (note) note.style.display = 'block'; }, 8000);
+    }
+
+    async function readJson(response) {
+      const type = response.headers.get('content-type') || '';
+      if (type.includes('application/json')) {
+        const data = await response.json();
+        if (!response.ok || data.error) throw new Error(data.error || `Request failed (${response.status}).`);
+        return data;
+      }
+      if (response.status === 502 || response.status === 503) {
+        throw new Error('The server is starting up. Please try again in a minute.');
+      }
+      throw new Error(`Unexpected server response (${response.status}).`);
+    }
+
+    function baseName(name) {
+      return (name || 'summary').replace(/\.[^.]+$/, '').replace(/[^\w-]+/g, '_').slice(0, 60) || 'summary';
+    }
+
     const uploadSection = document.querySelector('.upload-section');
     const fileInput = document.getElementById('fileInput');
     const loading = document.querySelector('.loading');
@@ -1146,32 +1269,29 @@
     });
 
     function handleFile(file) {
+        error.style.display = 'none';
+        if (file.size > MAX_UPLOAD_BYTES) {
+            showError(`File is too large. The limit is {{ max_upload_mb }} MB.`);
+            return;
+        }
+
         const formData = new FormData();
         formData.append('file', file);
+        formData.append('length', summaryLength);
 
-        // Show loading, hide results and error
         loading.style.display = 'block';
         results.style.display = 'none';
-        error.style.display = 'none';
+        const wakeTimer = startWakeTimer(loading);
 
-        fetch('/process', {
-            method: 'POST',
-            body: formData
-        })
-        .then(response => response.json())
+        fetch('/process', { method: 'POST', body: formData })
+        .then(readJson)
         .then(data => {
-            if (data.error) {
-                throw new Error(data.error);
-            }
-            
-            // Display results
             extractedText.textContent = data.extracted_text;
-            summary.innerHTML = marked.parse(data.summary);
-            downloadLink.href = data.download_url;
-            downloadLink.style.display = 'inline-flex';
+            renderMarkdown(summary, data.summary);
+            setEngineBadge(document.getElementById('engineBadge'), data.engine);
+            setDownload(downloadLink, data.summary_text, baseName(file.name) + '_summary.txt');
             results.style.display = 'block';
 
-            // Check if text height exceeds 2 lines to show Read Full button
             extractedText.classList.remove('expanded');
             fadeOverlay.classList.remove('hidden');
             readMoreBtn.textContent = "Read Full";
@@ -1183,10 +1303,12 @@
             }
         })
         .catch(err => {
-            showError(err.message);
+            showError(err.message === 'Failed to fetch' ? 'Could not reach the server. Please check your connection and try again.' : err.message);
         })
         .finally(() => {
+            clearTimeout(wakeTimer);
             loading.style.display = 'none';
+            fileInput.value = '';
         });
     }
 
@@ -1200,7 +1322,9 @@
   const themeIcon = document.getElementById("themeIcon");
 
   // Load preference if stored
-  if (localStorage.getItem("theme") === "dark") {
+  let savedTheme = null;
+  try { savedTheme = localStorage.getItem("theme"); } catch (e) {}
+  if (savedTheme === "dark") {
     document.body.classList.add("dark-mode");
     themeToggle.checked = true;
     themeIcon.classList.remove("fa-sun");
@@ -1220,11 +1344,11 @@
     if (isDark) {
       themeIcon.classList.remove("fa-sun");
       themeIcon.classList.add("fa-moon");
-      localStorage.setItem("theme", "dark");
+      try { localStorage.setItem("theme", "dark"); } catch (e) {}
     } else {
       themeIcon.classList.remove("fa-moon");
       themeIcon.classList.add("fa-sun");
-      localStorage.setItem("theme", "light");
+      try { localStorage.setItem("theme", "light"); } catch (e) {}
     }
   });
 
@@ -1260,7 +1384,7 @@ processYoutubeButton.addEventListener("click", () => {
     showVideoError("Please enter a YouTube video URL.");
     return;
   }
-  processVideo({ video_source: youtubeUrl, is_youtube: true });
+  processVideo({ video_source: youtubeUrl.trim(), is_youtube: true, length: summaryLength }, false, 'youtube');
 });
 
 // Process local video file
@@ -1270,19 +1394,23 @@ processLocalButton.addEventListener("click", () => {
     showVideoError("Please select a local video file.");
     return;
   }
+  if (localVideoFile.size > MAX_UPLOAD_BYTES) {
+    showVideoError("File is too large. The limit is {{ max_upload_mb }} MB.");
+    return;
+  }
   const formData = new FormData();
   formData.append("video_file", localVideoFile);
-  processVideo(formData, true);
+  formData.append("length", summaryLength);
+  processVideo(formData, true, baseName(localVideoFile.name));
 });
 
 // Process video (common function)
-function processVideo(data, isLocal = false) {
+function processVideo(data, isLocal = false, name = 'video') {
   videoLoading.style.display = "block";
   videoError.style.display = "none";
   videoResults.style.display = "none";
+  const wakeTimer = startWakeTimer(videoLoading);
 
-  const url = "/process_video"; // Ensure this is correct
-  console.log("Fetching from URL:", url);
   const options = isLocal
     ? { method: "POST", body: data }
     : {
@@ -1291,38 +1419,20 @@ function processVideo(data, isLocal = false) {
         body: JSON.stringify(data),
       };
 
-  fetch(url, options)
-    .then(async (response) => {
-      const contentType = response.headers.get("content-type");
-
-      if (!response.ok) {
-        const text = await response.text();
-        throw new Error(`Server Error: ${response.status}\n${text}`);
-      }
-
-      if (contentType && contentType.includes("application/json")) {
-        return response.json();
-      } else {
-        const text = await response.text();
-        throw new Error("Unexpected response type: " + text.slice(0, 100));
-      }
-    })
+  fetch("/process_video", options)
+    .then(readJson)
     .then((result) => {
-      if (result.error) {
-        throw new Error(result.error);
-      }
-
-      videoSummary.innerHTML = marked.parse(result.summary);
+      renderMarkdown(videoSummary, result.summary);
+      setEngineBadge(document.getElementById("videoEngineBadge"), result.engine, result.source);
       videoResults.style.display = "block";
       videoSummarySection.style.display = "block";
-      downloadLink1.href = result.download_url;
-      downloadLink1.style.display = "inline-flex";
+      setDownload(downloadLink1, result.summary_text, name + "_summary.txt");
     })
     .catch((err) => {
-      console.error("Raw error:", err);
-      showVideoError("Failed to process video: " + err.message);
+      showVideoError(err.message === "Failed to fetch" ? "Could not reach the server. Please check your connection and try again." : err.message);
     })
     .finally(() => {
+      clearTimeout(wakeTimer);
       videoLoading.style.display = "none";
     });
 }

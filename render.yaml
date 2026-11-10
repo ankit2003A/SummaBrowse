@@ -1,31 +1,24 @@
 services:
   - type: web
     name: summabrowse
-    env: python
+    runtime: docker
+    dockerfilePath: ./Dockerfile
     region: oregon
-    build:
-      dockerfile: Dockerfile
-    envVars:
-      - key: PYTHONUNBUFFERED
-        value: 1
-      - key: PYTHONDONTWRITEBYTECODE
-        value: 1
-      - key: FLASK_ENV
-        value: production
-      - key: FLASK_APP
-        value: app.py
-      - key: PORT
-        value: 10000
-      - key: WEB_CONCURRENCY
-        value: "2"
-      - key: GUNICORN_CMD_ARGS
-        value: "--workers=2 --threads=2"
     plan: free
     autoDeploy: true
     healthCheckPath: /healthz
-    numInstances: 1
-    env: python3.10
-    disk:
-      name: summabrowse-disk
-      mountPath: /app/uploads
-      sizeGB: 1
+    envVars:
+      - key: GEMINI_API_KEY
+        sync: false          # set the value in the Render dashboard
+      - key: GEMINI_MODEL
+        value: gemini-3.5-flash
+      - key: WEB_CONCURRENCY
+        value: "1"
+      - key: MAX_UPLOAD_MB
+        value: "25"
+      - key: MAX_VIDEO_MINUTES
+        value: "30"
+      - key: PROCESS_RATE_LIMIT
+        value: "10 per hour;3 per minute"
+      - key: VIDEO_RATE_LIMIT
+        value: "5 per hour;2 per minute"
